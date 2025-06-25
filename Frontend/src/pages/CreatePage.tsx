@@ -13,6 +13,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { pagesApi, stripeApi } from '@/lib/api';
+import { usePlanLimits } from '@/hooks/usePlanLimits';
+import PlanUpgradePrompt from '@/components/PlanUpgradePrompt';
 
 interface FormField {
   label: string;
@@ -41,6 +43,7 @@ const CreatePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { canCreatePage, usage, limits, isTrialExpired } = usePlanLimits();
 
   const isStripeConnected = !!user?.stripeAccountId;
 
@@ -144,6 +147,26 @@ const CreatePage = () => {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* Plan Limit Warning */}
+        {!canCreatePage && (
+          <PlanUpgradePrompt
+            feature="Page Limit Reached"
+            description={`You've reached your plan limit of ${limits.maxPages} pages. Upgrade to create more checkout pages.`}
+            variant="warning"
+            className="mb-6"
+          />
+        )}
+
+        {/* Trial Expiration Warning */}
+        {isTrialExpired && (
+          <PlanUpgradePrompt
+            feature="Trial Expired"
+            description="Your trial has expired. Upgrade now to continue creating and managing checkout pages."
+            variant="warning"
+            className="mb-6"
+          />
+        )}
+
         {!isStripeConnected && (
           <Alert className="mb-8 border-blue-200 bg-blue-50">
             <AlertTriangle className="h-4 w-4 text-blue-600" />
@@ -170,6 +193,26 @@ const CreatePage = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Show form only if user can create pages */}
+          {!canCreatePage ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Cannot Create New Page
+                </h3>
+                <p className="text-gray-500 mb-6">
+                  You've reached your plan limit or your trial has expired. Please upgrade your plan to continue.
+                </p>
+                <Button onClick={() => navigate('/plans')}>
+                  View Plans
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -404,6 +447,8 @@ const CreatePage = () => {
               )}
             </Button>
           </div>
+          </>
+          )}
         </form>
       </div>
     </div>

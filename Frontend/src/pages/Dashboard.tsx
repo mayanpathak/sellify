@@ -154,11 +154,15 @@ const Dashboard = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" onClick={() => navigate('/submissions')}>
+              <Button variant="outline" size="sm" onClick={() => navigate('/analytics')}>
                 <BarChart3 className="w-4 h-4 mr-2" />
+                Analytics
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/submissions')}>
+                <Eye className="w-4 h-4 mr-2" />
                 Submissions
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </Button>
@@ -181,6 +185,87 @@ const Dashboard = () => {
             Manage your checkout pages and track your sales performance.
           </p>
         </div>
+
+        {/* Plan Usage Warning */}
+        {user?.plan === 'free' && pages.length >= 8 && (
+          <Alert className="mb-4 border-yellow-200 bg-yellow-50">
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <strong>Approaching page limit</strong>
+                  <p className="text-sm mt-1">
+                    You're using {pages.length} of 10 pages. Upgrade to create more checkout pages.
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => navigate('/plans')}
+                  className="ml-4 bg-yellow-600 hover:bg-yellow-700 text-white"
+                  size="sm"
+                >
+                  Upgrade Plan
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Trial Expiration Warning */}
+        {user?.plan === 'free' && user?.trialExpiresAt && (() => {
+          const trialEnd = new Date(user.trialExpiresAt);
+          const now = new Date();
+          const daysLeft = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          const isExpired = daysLeft <= 0;
+          
+          if (isExpired) {
+            return (
+              <Alert className="mb-4 border-red-200 bg-red-50">
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>Trial expired</strong>
+                      <p className="text-sm mt-1">
+                        Your trial has expired. Upgrade now to continue using all features.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => navigate('/plans')}
+                      className="ml-4 bg-red-600 hover:bg-red-700 text-white"
+                      size="sm"
+                    >
+                      Upgrade Now
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            );
+          } else if (daysLeft <= 7) {
+            return (
+              <Alert className="mb-4 border-yellow-200 bg-yellow-50">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>Trial ending soon</strong>
+                      <p className="text-sm mt-1">
+                        Your trial expires in {daysLeft} days. Upgrade to keep access to all features.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => navigate('/plans')}
+                      className="ml-4 bg-yellow-600 hover:bg-yellow-700 text-white"
+                      size="sm"
+                    >
+                      Upgrade Plan
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            );
+          }
+          return null;
+        })()}
 
         {/* Stripe Connection Status */}
         {!isStripeConnected && (
@@ -247,6 +332,38 @@ const Dashboard = () => {
               <p className="text-xs text-muted-foreground">
                 of {getMaxPages(user?.plan || 'free')} allowed
               </p>
+              {user?.plan === 'free' && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        pages.length >= 10 ? 'bg-red-500' : 
+                        pages.length >= 8 ? 'bg-yellow-500' : 'bg-blue-500'
+                      }`}
+                      style={{ width: `${Math.min((pages.length / 10) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pages.length >= 10 ? 'Limit reached' : `${10 - pages.length} remaining`}
+                  </p>
+                </div>
+              )}
+              {user?.plan === 'builder' && (
+                <div className="mt-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        pages.length >= 25 ? 'bg-red-500' : 
+                        pages.length >= 20 ? 'bg-yellow-500' : 'bg-blue-500'
+                      }`}
+                      style={{ width: `${Math.min((pages.length / 25) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pages.length >= 25 ? 'Limit reached' : `${25 - pages.length} remaining`}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -293,13 +410,42 @@ const Dashboard = () => {
         {/* Pages Section */}
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-gray-900">Your Pages</h3>
-          <Button
-            onClick={() => navigate('/create-page')}
-            className="bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-700 hover:to-sky-600"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create New Page
-          </Button>
+          {(() => {
+            const canCreatePage = user?.plan === 'pro' || 
+                                 (user?.plan === 'builder' && pages.length < 25) ||
+                                 (user?.plan === 'free' && pages.length < 10);
+            
+            if (!canCreatePage) {
+              return (
+                <div className="flex items-center gap-2">
+                  <Button
+                    disabled
+                    className="bg-gray-400 cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Page Limit Reached
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/plans')}
+                    className="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600"
+                    size="sm"
+                  >
+                    Upgrade Plan
+                  </Button>
+                </div>
+              );
+            }
+            
+            return (
+              <Button
+                onClick={() => navigate('/create-page')}
+                className="bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-700 hover:to-sky-600"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Page
+              </Button>
+            );
+          })()}
         </div>
 
         {/* Pages Grid */}

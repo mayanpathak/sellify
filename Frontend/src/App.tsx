@@ -12,6 +12,9 @@ import Dashboard from "./pages/Dashboard";
 import CreatePage from "./pages/CreatePage";
 import CheckoutPage from "./pages/CheckoutPage";
 import Submissions from "./pages/Submissions";
+import Settings from "./pages/Settings";
+import Analytics from "./pages/Analytics";
+import PlanManagement from "./pages/PlanManagement";
 import StripeReturn from "./pages/StripeReturn";
 import StripeRefresh from "./pages/StripeRefresh";
 import NotFound from "./pages/NotFound";
@@ -51,6 +54,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Submissions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <Analytics />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/plans" 
+              element={
+                <ProtectedRoute>
+                  <PlanManagement />
                 </ProtectedRoute>
               } 
             />
