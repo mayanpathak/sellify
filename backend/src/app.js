@@ -89,7 +89,11 @@ app.use(cors({
     'http://localhost:8080',
     'http://localhost:5173',
     'https://sellify-delta.vercel.app',
-    'https://sellify-delta.vercel.app/'
+    'https://sellify-delta.vercel.app/',
+    // Add common Vercel deployment patterns
+    /^https:\/\/.*\.vercel\.app$/,
+    // Allow any subdomain of vercel.app for development
+    /^https:\/\/.*\.vercel\.app\/$/
   ],
   credentials: true,
 }));

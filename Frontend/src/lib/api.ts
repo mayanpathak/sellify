@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://sellify-o36c.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://sellify-o36c.onrender.com';
 
 // Types
 export interface User {
@@ -141,7 +141,7 @@ class ApiClient {
 
   // Auth Methods
   async register(userData: { name: string; email: string; password: string }): Promise<AuthResponse<{ user: User; token: string }>> {
-    const response = await this.request<{ user: User; token: string }>('/auth/register', {
+    const response = await this.request<{ user: User; token: string }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     }) as AuthResponse<{ user: User; token: string }>;
@@ -154,7 +154,7 @@ class ApiClient {
   }
 
   async login(credentials: { email: string; password: string }): Promise<AuthResponse<{ user: User; token: string }>> {
-    const response = await this.request<{ user: User; token: string }>('/auth/login', {
+    const response = await this.request<{ user: User; token: string }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     }) as AuthResponse<{ user: User; token: string }>;
@@ -167,67 +167,67 @@ class ApiClient {
   }
 
   async logout() {
-    const response = await this.request('/auth/logout', { method: 'POST' });
+    const response = await this.request('/api/auth/logout', { method: 'POST' });
     this.removeToken();
     return response;
   }
 
   async getCurrentUser() {
-    return this.request<{ user: User }>('/auth/me');
+    return this.request<{ user: User }>('/api/auth/me');
   }
 
   // Pages Methods
   async createPage(pageData: Partial<CheckoutPage>) {
-    return this.request<{ page: CheckoutPage }>('/pages', {
+    return this.request<{ page: CheckoutPage }>('/api/pages', {
       method: 'POST',
       body: JSON.stringify(pageData),
     });
   }
 
   async getUserPages() {
-    return this.request<{ pages: CheckoutPage[] }>('/pages');
+    return this.request<{ pages: CheckoutPage[] }>('/api/pages');
   }
 
   async getPageBySlug(slug: string) {
-    return this.request<{ page: CheckoutPage; isStripeConnected: boolean }>(`/pages/${slug}`);
+    return this.request<{ page: CheckoutPage; isStripeConnected: boolean }>(`/api/pages/${slug}`);
   }
 
   async updatePage(id: string, pageData: Partial<CheckoutPage>) {
-    return this.request<{ page: CheckoutPage }>(`/pages/${id}`, {
+    return this.request<{ page: CheckoutPage }>(`/api/pages/${id}`, {
       method: 'PUT',
       body: JSON.stringify(pageData),
     });
   }
 
   async deletePage(id: string) {
-    return this.request(`/pages/${id}`, { method: 'DELETE' });
+    return this.request(`/api/pages/${id}`, { method: 'DELETE' });
   }
 
   // Submissions Methods
   async submitForm(slug: string, formData: Record<string, any>) {
-    return this.request<{ submissionId: string }>(`/pages/${slug}/submit`, {
+    return this.request<{ submissionId: string }>(`/api/pages/${slug}/submit`, {
       method: 'POST',
       body: JSON.stringify(formData),
     });
   }
 
   async getUserSubmissions() {
-    return this.request<{ submissions: Submission[] }>('/submissions');
+    return this.request<{ submissions: Submission[] }>('/api/submissions');
   }
 
   async getPageSubmissions(pageId: string) {
-    return this.request<{ submissions: Submission[] }>(`/pages/${pageId}/submissions`);
+    return this.request<{ submissions: Submission[] }>(`/api/pages/${pageId}/submissions`);
   }
 
   // Stripe Methods
   async connectStripeAccount() {
-    return this.request<{ stripeAccountId: string; onboardingUrl: string }>('/stripe/connect', {
+    return this.request<{ stripeAccountId: string; onboardingUrl: string }>('/api/stripe/connect', {
       method: 'POST',
     });
   }
 
   async createCheckoutSession(pageId: string) {
-    return this.request<{ url: string; sessionId: string }>(`/stripe/session/${pageId}`, {
+    return this.request<{ url: string; sessionId: string }>(`/api/stripe/session/${pageId}`, {
       method: 'POST',
     });
   }
