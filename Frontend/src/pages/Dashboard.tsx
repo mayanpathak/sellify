@@ -246,15 +246,15 @@ const Dashboard = () => {
   const stats = [
     {
       title: "Total Revenue",
-      value: "$12,345",
-      change: "+12.3%",
+      value: "_",
+      change: "",
       icon: DollarSign,
       color: "from-green-500 to-emerald-500"
     },
     {
       title: "Total Visitors",
-      value: "8,234",
-      change: "+8.1%",
+      value: "_",
+      change: "",
       icon: Users,
       color: "from-blue-500 to-cyan-500"
     },
@@ -301,7 +301,7 @@ const Dashboard = () => {
               {isStripeConnected ? (
                 <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
                   <CheckCircle className="w-3 h-3 mr-1" />
-                  Stripe Connected
+                  Stripe status : ``
                 </Badge>
               ) : (
                 <Badge variant="outline" className="border-blue-600 text-blue-700 bg-blue-50 font-semibold">
@@ -357,7 +357,7 @@ const Dashboard = () => {
         {/* Enhanced Welcome Section */}
         <div ref={welcomeRef} className="mb-8">
           <h2 className="text-4xl font-black text-gray-900 mb-3">
-            Welcome back, <span className="gradient-text">{user?.name?.split(' ')[0]}!</span>
+            Welcome , <span className="gradient-text">{user?.name?.split(' ')[0]}!</span>
           </h2>
           <p className="text-xl text-gray-600 leading-relaxed">
             Manage your checkout pages and track your sales performance.
