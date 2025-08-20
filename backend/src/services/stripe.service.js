@@ -35,6 +35,7 @@
 
 import User from '../models/user.model.js';
 import CheckoutPage from '../models/CheckoutPage.js';
+import Payment from '../models/Payment.js';
 import stripe from '../config/stripe.js';
 
 /**
@@ -110,67 +111,125 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
     }
 
     try {
+        // Calculate total amount including order bumps
+        let totalAmount = Math.round(page.price * 100);
+        const orderBumpAmount = (page.orderBumps || []).reduce((sum, bump) => 
+            sum + Math.round(bump.price * 100), 0
+        );
+        totalAmount += orderBumpAmount;
+
+        // Create line items
+        const lineItems = [
+            {
+                price_data: {
+                    currency: page.currency || 'usd',
+                    product_data: {
+                        name: page.productName || 'Unnamed Product',
+                        description: page.description || '',
+                    },
+                    unit_amount: Math.round(page.price * 100), // Convert to cents
+                },
+                quantity: 1,
+            },
+            // Add order bumps if they exist
+            ...((page.orderBumps || []).map(bump => ({
+                price_data: {
+                    currency: page.currency || 'usd',
+                    product_data: {
+                        name: bump.title,
+                    },
+                    unit_amount: Math.round(bump.price * 100),
+                    recurring: bump.recurring ? { interval: 'month' } : undefined,
+                },
+                quantity: 1,
+            }))),
+        ];
+
         // Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
-            line_items: [
-                {
-                    price_data: {
-                        currency: page.currency || 'usd',
-                        product_data: {
-                            name: page.productName || 'Unnamed Product',
-                            description: page.description || '',
-                        },
-                        unit_amount: Math.round(page.price * 100), // Convert to cents
-                    },
-                    quantity: 1,
-                },
-                // Add order bumps if they exist
-                ...((page.orderBumps || []).map(bump => ({
-                    price_data: {
-                        currency: page.currency || 'usd',
-                        product_data: {
-                            name: bump.title,
-                        },
-                        unit_amount: Math.round(bump.price * 100),
-                        recurring: bump.recurring ? { interval: 'month' } : undefined,
-                    },
-                    quantity: 1,
-                }))),
-            ],
+            line_items: lineItems,
             mode: 'payment',
             success_url:
                 page.successRedirectUrl ||
-                `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+                `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url:
                 page.cancelRedirectUrl ||
                 `${process.env.CLIENT_URL}/page/${page.slug}`,
             stripe_account: user.stripeAccountId, // Stripe Connect
             payment_intent_data: {
-                application_fee_amount: Math.round(page.price * 100 * 0.05), // 5% platform fee
+                application_fee_amount: Math.round(totalAmount * 0.05), // 5% platform fee
             },
             metadata: {
                 pageId: pageId,
                 userId: userId,
+                totalAmount: totalAmount.toString(),
             },
         });
+
+        // Create pending payment record
+        const payment = new Payment({
+            userId: userId,
+            pageId: pageId,
+            stripeSessionId: session.id,
+            stripeAccountId: user.stripeAccountId,
+            amount: totalAmount,
+            currency: page.currency || 'usd',
+            applicationFeeAmount: Math.round(totalAmount * 0.05),
+            status: 'pending',
+            metadata: new Map(Object.entries({
+                pageId: pageId,
+                userId: userId,
+                totalAmount: totalAmount.toString(),
+            })),
+            stripeCreatedAt: new Date(session.created * 1000),
+        });
+
+        await payment.save();
 
         return {
             success: true,
             message: 'Stripe checkout session created.',
             url: session.url,
             sessionId: session.id,
+            paymentId: payment._id,
         };
     } catch (error) {
+        console.error('Stripe checkout session creation error:', error);
+        
         // Fallback for development
         if (process.env.NODE_ENV === 'development' && user.stripeAccountId.startsWith('acct_mock_')) {
+            const mockSessionId = `cs_test_mock_${Date.now()}`;
+            
+            // Create mock payment record
+            const payment = new Payment({
+                userId: userId,
+                pageId: pageId,
+                stripeSessionId: mockSessionId,
+                stripeAccountId: user.stripeAccountId,
+                amount: Math.round(page.price * 100),
+                currency: page.currency || 'usd',
+                applicationFeeAmount: Math.round(page.price * 100 * 0.05),
+                status: 'pending',
+                metadata: new Map(Object.entries({
+                    pageId: pageId,
+                    userId: userId,
+                    mock: 'true'
+                })),
+                stripeCreatedAt: new Date(),
+            });
+
+            await payment.save();
+
             return {
                 success: true,
                 message: 'Stripe checkout session created (mocked for development).',
-                url: `https://checkout.stripe.com/mock/pay/cs_test_${Date.now()}`,
-                sessionId: `cs_test_mock_${Date.now()}`,
+                url: `${process.env.CLIENT_URL}/payment/success?session_id=${mockSessionId}`,
+                sessionId: mockSessionId,
+                paymentId: payment._id,
             };
         }
-                 throw error;
+        
+        throw error;
     }
 };

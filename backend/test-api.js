@@ -9,10 +9,11 @@
 
 const BASE_URL = 'http://localhost:5000/api';
 
-// Test user data
+// Test user data with timestamp to ensure uniqueness
+const timestamp = Date.now();
 const testUser = {
     name: 'Test User',
-    email: 'test@example.com',
+    email: `test${timestamp}@example.com`,
     password: 'TestPass123'
 };
 
@@ -48,10 +49,24 @@ async function makeRequest(endpoint, method = 'GET', data = null, headers = {}) 
 
     try {
         const response = await fetch(url, options);
-        const result = await response.json();
+        
+        let result = null;
+        // Handle empty responses (like DELETE 204)
+        if (response.status !== 204) {
+            try {
+                result = await response.json();
+            } catch (jsonError) {
+                // If JSON parsing fails but status is ok, it might be empty response
+                if (response.ok) {
+                    result = null;
+                } else {
+                    throw jsonError;
+                }
+            }
+        }
         
         console.log(`${method} ${endpoint}: ${response.status}`);
-        if (!response.ok) {
+        if (!response.ok && result) {
             console.log('Error:', result);
         }
         
@@ -139,7 +154,7 @@ async function testPages() {
     
     // Test update page
     if (pageId) {
-        const updateResult = await makeRequest(`/pages/${pageId}`, 'PUT', {
+        const updateResult = await makeRequest(`/pages/${pageId}`, 'PATCH', {
             title: 'Updated Test Product Page',
             price: 39.99
         }, {
@@ -217,6 +232,16 @@ async function testStripe() {
         console.log('❌ Stripe account connection failed');
     }
     
+    // Test get Stripe connection status
+    const statusResult = await makeRequest('/stripe/status', 'GET', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (statusResult.status === 200) {
+        console.log('✅ Stripe connection status check successful');
+    } else {
+        console.log('❌ Stripe connection status check failed');
+    }
+    
     // Test create checkout session
     if (pageId) {
         const sessionResult = await makeRequest(`/stripe/session/${pageId}`, 'POST', {}, {
@@ -227,6 +252,116 @@ async function testStripe() {
         } else {
             console.log('❌ Stripe checkout session creation failed');
         }
+    }
+    
+    // Test disconnect Stripe account
+    const disconnectResult = await makeRequest('/stripe/disconnect', 'DELETE', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (disconnectResult.status === 200) {
+        console.log('✅ Stripe account disconnection successful');
+    } else {
+        console.log('❌ Stripe account disconnection failed');
+    }
+    
+    // Reconnect for other tests
+    const reconnectResult = await makeRequest('/stripe/connect', 'POST', {}, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (reconnectResult.status === 200) {
+        console.log('✅ Stripe account reconnection successful');
+    } else {
+        console.log('❌ Stripe account reconnection failed');
+    }
+}
+
+async function testAnalytics() {
+    console.log('\n=== Testing Analytics ===');
+    
+    if (!authToken) {
+        console.log('❌ No auth token available for analytics tests');
+        return;
+    }
+    
+    // Test get payment analytics
+    const paymentAnalyticsResult = await makeRequest('/analytics/payments', 'GET', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (paymentAnalyticsResult.status === 200) {
+        console.log('✅ Payment analytics successful');
+    } else {
+        console.log('❌ Payment analytics failed');
+    }
+    
+    // Test get page analytics
+    if (pageId) {
+        const pageAnalyticsResult = await makeRequest(`/analytics/pages/${pageId}`, 'GET', null, {
+            'Authorization': `Bearer ${authToken}`
+        });
+        if (pageAnalyticsResult.status === 200) {
+            console.log('✅ Page analytics successful');
+        } else {
+            console.log('❌ Page analytics failed');
+        }
+    }
+    
+    // Test get Stripe account status
+    const stripeStatusResult = await makeRequest('/analytics/stripe-status', 'GET', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (stripeStatusResult.status === 200) {
+        console.log('✅ Stripe account status check successful');
+    } else {
+        console.log('❌ Stripe account status check failed');
+    }
+}
+
+async function testPlans() {
+    console.log('\n=== Testing Plans ===');
+    
+    if (!authToken) {
+        console.log('❌ No auth token available for plan tests');
+        return;
+    }
+    
+    // Test get plans
+    const plansResult = await makeRequest('/plans', 'GET', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (plansResult.status === 200) {
+        console.log('✅ Get plans successful');
+    } else {
+        console.log('❌ Get plans failed');
+    }
+    
+    // Test get plan usage
+    const usageResult = await makeRequest('/plans/usage', 'GET', null, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (usageResult.status === 200) {
+        console.log('✅ Get plan usage successful');
+    } else {
+        console.log('❌ Get plan usage failed');
+    }
+    
+    // Test plan upgrade to builder
+    const upgradeResult = await makeRequest('/plans/upgrade', 'POST', { planId: 'builder' }, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (upgradeResult.status === 200) {
+        console.log('✅ Plan upgrade to builder successful');
+    } else {
+        console.log('❌ Plan upgrade to builder failed');
+    }
+    
+    // Test plan upgrade to pro
+    const upgradeProResult = await makeRequest('/plans/upgrade', 'POST', { planId: 'pro' }, {
+        'Authorization': `Bearer ${authToken}`
+    });
+    if (upgradeProResult.status === 200) {
+        console.log('✅ Plan upgrade to pro successful');
+    } else {
+        console.log('❌ Plan upgrade to pro failed');
     }
 }
 
@@ -287,6 +422,8 @@ async function runTests() {
         await testPages();
         await testSubmissions();
         await testStripe();
+        await testAnalytics();
+        await testPlans();
         await testValidation();
         await cleanup();
         

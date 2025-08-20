@@ -19,369 +19,308 @@ import {
   AlertTriangle,
   ArrowRight
 } from 'lucide-react';
-import { apiClient } from '../lib/api';
+import { planApi } from '../lib/api';
 import { toast } from '../hooks/use-toast';
 
-interface PlanFeature {
+interface Plan {
+  id: string;
   name: string;
-  included: boolean;
-  description?: string;
+  description: string;
+  maxPages: number | string;
+  price: number;
+  features: string[];
+  popular?: boolean;
+  current: boolean;
 }
 
-interface Plan {
-  id: 'free' | 'builder' | 'pro';
-  name: string;
-  price: number;
-  period: string;
-  description: string;
-  features: PlanFeature[];
-  popular?: boolean;
-  current?: boolean;
+interface CurrentPlan {
+  id: string;
   maxPages: number;
+  pagesUsed: number;
+  pagesRemaining: number | string;
+  usagePercentage: number;
 }
 
 const PlanManagement: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<{ totalPages: number; totalSubmissions: number } | null>(null);
-
-  const plans: Plan[] = [
-    {
-      id: 'free',
-      name: 'Free',
-      price: 0,
-      period: 'forever',
-      description: 'Perfect for getting started with basic checkout pages',
-      maxPages: 10,
-      features: [
-        { name: 'Up to 10 checkout pages', included: true },
-        { name: 'Basic form fields', included: true },
-        { name: 'Email notifications', included: true },
-        { name: 'Basic analytics', included: true },
-        { name: 'Community support', included: true },
-        { name: 'Custom branding', included: false },
-        { name: 'Advanced form fields', included: false },
-        { name: 'Priority support', included: false },
-        { name: 'Advanced analytics', included: false },
-        { name: 'API access', included: false }
-      ],
-      current: user?.plan === 'free'
-    },
-    {
-      id: 'builder',
-      name: 'Builder',
-      price: 29,
-      period: 'month',
-      description: 'Great for growing businesses with more customization needs',
-      maxPages: 25,
-      popular: true,
-      features: [
-        { name: 'Up to 25 checkout pages', included: true },
-        { name: 'All form field types', included: true },
-        { name: 'Custom styling options', included: true },
-        { name: 'Advanced analytics', included: true },
-        { name: 'Priority email support', included: true },
-        { name: 'Custom branding', included: true },
-        { name: 'Webhook integrations', included: true },
-        { name: 'Export submissions', included: true },
-        { name: 'API access', included: false },
-        { name: 'White-label solution', included: false }
-      ],
-      current: user?.plan === 'builder'
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: 99,
-      period: 'month',
-      description: 'Everything you need to scale your business',
-      maxPages: Infinity,
-      features: [
-        { name: 'Unlimited checkout pages', included: true },
-        { name: 'All form field types', included: true },
-        { name: 'Complete customization', included: true },
-        { name: 'Advanced analytics & reports', included: true },
-        { name: 'Priority phone & email support', included: true },
-        { name: 'Custom branding', included: true },
-        { name: 'Advanced webhook integrations', included: true },
-        { name: 'Full API access', included: true },
-        { name: 'White-label solution', included: true },
-        { name: 'Custom integrations', included: true }
-      ],
-      current: user?.plan === 'pro'
-    }
-  ];
+  const [upgradeLoading, setUpgradeLoading] = useState<string | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
 
   useEffect(() => {
-    fetchUsageStats();
+    fetchPlansData();
   }, []);
 
-  const fetchUsageStats = async () => {
+  const fetchPlansData = async () => {
     try {
-      const [pagesResponse, submissionsResponse] = await Promise.all([
-        apiClient.getUserPages(),
-        apiClient.getUserSubmissions()
-      ]);
-
-      setStats({
-        totalPages: pagesResponse.data?.pages?.length || 0,
-        totalSubmissions: submissionsResponse.data?.submissions?.length || 0
-      });
+      setLoading(true);
+      const response = await planApi.getPlans();
+      setPlans(response.data.plans);
+      setCurrentPlan(response.data.currentPlan);
     } catch (error) {
-      console.error('Failed to fetch usage stats:', error);
-    }
-  };
-
-  const handleUpgrade = async (planId: string) => {
-    setLoading(true);
-    try {
-      // This would typically redirect to Stripe Checkout or your payment processor
-      toast({
-        title: "Upgrade Plan",
-        description: `Redirecting to upgrade to ${planId} plan...`,
-      });
-      
-      // Simulate upgrade process
-      setTimeout(() => {
-        toast({
-          title: "Success",
-          description: "Plan upgraded successfully!",
-        });
-        setLoading(false);
-      }, 2000);
-    } catch (error) {
+      console.error('Failed to fetch plans data:', error);
       toast({
         title: "Error",
-        description: "Failed to upgrade plan. Please try again.",
+        description: "Failed to load plans data. Please try again.",
         variant: "destructive"
       });
+    } finally {
       setLoading(false);
     }
   };
 
-  const getCurrentPlan = () => plans.find(plan => plan.current);
-  const currentPlan = getCurrentPlan();
+  const handleUpgrade = async (planId: string) => {
+    if (user?.plan === planId) {
+      toast({
+        title: "Already on this plan",
+        description: `You are already on the ${planId} plan.`,
+      });
+      return;
+    }
 
-  const getUsagePercentage = () => {
-    if (!stats || !currentPlan) return 0;
-    if (currentPlan.maxPages === Infinity) return 0;
-    return (stats.totalPages / currentPlan.maxPages) * 100;
+    setUpgradeLoading(planId);
+    try {
+      const response = await planApi.upgradePlan(planId);
+      
+      toast({
+        title: "Success",
+        description: response.data.message,
+      });
+      
+      // Refresh user data and plans data
+      await refreshUser();
+      await fetchPlansData();
+      
+    } catch (error: any) {
+      console.error('Failed to upgrade plan:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to upgrade plan. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUpgradeLoading(null);
+    }
   };
 
-  const isTrialExpired = () => {
-    if (!user?.trialExpiresAt) return false;
-    return new Date() > new Date(user.trialExpiresAt);
+  const getPlanIcon = (planId: string) => {
+    switch (planId) {
+      case 'free':
+        return <Star className="h-6 w-6" />;
+      case 'builder':
+        return <Zap className="h-6 w-6" />;
+      case 'pro':
+        return <Crown className="h-6 w-6" />;
+      default:
+        return <Star className="h-6 w-6" />;
+    }
   };
 
-  const getTrialDaysLeft = () => {
-    if (!user?.trialExpiresAt) return 0;
-    const now = new Date();
-    const trialEnd = new Date(user.trialExpiresAt);
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
+  const getPlanColor = (planId: string) => {
+    switch (planId) {
+      case 'free':
+        return 'border-gray-200';
+      case 'builder':
+        return 'border-blue-200 shadow-lg ring-2 ring-blue-100';
+      case 'pro':
+        return 'border-purple-200 shadow-lg ring-2 ring-purple-100';
+      default:
+        return 'border-gray-200';
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="space-y-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Choose Your Plan</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Scale your business with the right plan. Upgrade or downgrade anytime.
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Plan Management
+          </h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Choose the plan that fits your needs. All plans include a free upgrade for testing purposes.
           </p>
         </div>
 
-        {/* Current Plan Status */}
+        {/* Current Plan Usage */}
         {currentPlan && (
-          <Card className="border-2 border-blue-200 bg-blue-50/50">
+          <Card className="mb-8">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-blue-600" />
-                Current Plan: {currentPlan.name}
-                {currentPlan.id === 'pro' && <Crown className="h-5 w-5 text-yellow-500" />}
+                <TrendingUp className="h-5 w-5" />
+                Current Plan Usage
               </CardTitle>
               <CardDescription>
-                {currentPlan.description}
+                Track your current plan usage and limits
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {user?.plan === 'free' && user?.trialExpiresAt && (
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  {isTrialExpired() ? (
-                    <Alert className="border-red-200 bg-red-50">
-                      <AlertTriangle className="h-4 w-4 text-red-600" />
-                      <AlertDescription className="text-red-800">
-                        Your trial has expired. Upgrade now to continue using all features.
-                      </AlertDescription>
-                    </Alert>
-                  ) : (
-                    <Alert className="border-yellow-200 bg-yellow-50">
-                      <Calendar className="h-4 w-4 text-yellow-600" />
-                      <AlertDescription className="text-yellow-800">
-                        Trial expires in {getTrialDaysLeft()} days. Upgrade to keep access to all features.
+                  <p className="text-sm font-medium text-gray-500">Current Plan</p>
+                  <p className="text-2xl font-bold text-gray-900 capitalize">{currentPlan.id}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Pages Used</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {currentPlan.pagesUsed} / {currentPlan.maxPages === Infinity ? 'Unlimited' : currentPlan.maxPages}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Pages Remaining</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {currentPlan.pagesRemaining}
+                  </p>
+                </div>
+              </div>
+              
+              {currentPlan.maxPages !== Infinity && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Usage</span>
+                    <span>{currentPlan.usagePercentage}%</span>
+                  </div>
+                  <Progress value={currentPlan.usagePercentage} className="h-2" />
+                  {currentPlan.usagePercentage >= 80 && (
+                    <Alert className="mt-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        {currentPlan.usagePercentage >= 100 
+                          ? "You've reached your page limit. Upgrade to create more pages."
+                          : "You're approaching your page limit. Consider upgrading your plan."
+                        }
                       </AlertDescription>
                     </Alert>
                   )}
-                </div>
-              )}
-
-              {stats && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Pages Used</span>
-                      <span className="text-sm text-muted-foreground">
-                        {stats.totalPages} / {currentPlan.maxPages === Infinity ? '∞' : currentPlan.maxPages}
-                      </span>
-                    </div>
-                    {currentPlan.maxPages !== Infinity && (
-                      <Progress value={getUsagePercentage()} className="h-2" />
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium">Total Submissions</span>
-                    <p className="text-2xl font-bold text-blue-600">{stats.totalSubmissions}</p>
-                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Pricing Plans */}
-        <div className="grid gap-6 md:grid-cols-3">
+        {/* Plans Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((plan) => (
             <Card 
               key={plan.id} 
-              className={`relative ${plan.popular ? 'border-2 border-blue-500 shadow-lg' : ''} ${plan.current ? 'ring-2 ring-green-500' : ''}`}
+              className={`relative ${getPlanColor(plan.id)} ${plan.current ? 'ring-2 ring-green-500' : ''}`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-blue-500 text-white px-3 py-1">
-                    <Star className="h-3 w-3 mr-1" />
+                  <Badge className="bg-blue-600 text-white">
                     Most Popular
                   </Badge>
                 </div>
               )}
-              
               {plan.current && (
                 <div className="absolute -top-3 right-4">
-                  <Badge className="bg-green-500 text-white px-3 py-1">
+                  <Badge className="bg-green-600 text-white">
                     Current Plan
                   </Badge>
                 </div>
               )}
-
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <div className="space-y-2">
-                  <div className="text-4xl font-bold">
+              
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4">
+                  {getPlanIcon(plan.id)}
+                </div>
+                <CardTitle className="text-xl capitalize">{plan.name}</CardTitle>
+                <CardDescription>{plan.description}</CardDescription>
+                
+                <div className="mt-4">
+                  <span className="text-3xl font-bold">
                     ${plan.price}
-                    {plan.price > 0 && <span className="text-lg font-normal text-muted-foreground">/{plan.period}</span>}
-                  </div>
-                  <CardDescription className="text-sm">{plan.description}</CardDescription>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start gap-3">
-                      {feature.included ? (
-                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <X className="h-4 w-4 text-gray-300 mt-0.5 flex-shrink-0" />
-                      )}
-                      <span className={`text-sm ${feature.included ? 'text-gray-900' : 'text-gray-400'}`}>
-                        {feature.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <Separator />
-
-                <div className="pt-4">
-                  {plan.current ? (
-                    <Button disabled className="w-full">
-                      <Check className="h-4 w-4 mr-2" />
-                      Current Plan
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={() => handleUpgrade(plan.id)}
-                      disabled={loading}
-                      className={`w-full ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                      variant={plan.popular ? 'default' : 'outline'}
-                    >
-                      {loading ? (
-                        'Processing...'
-                      ) : (
-                        <>
-                          {plan.price === 0 ? 'Downgrade' : 'Upgrade'} to {plan.name}
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </>
-                      )}
-                    </Button>
+                  </span>
+                  <span className="text-gray-500 ml-1">
+                    {plan.price === 0 ? 'free' : '/month'}
+                  </span>
+                  {plan.price > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      Free for Testing
+                    </Badge>
                   )}
                 </div>
+              </CardHeader>
+              
+              <CardContent>
+                <div className="mb-6">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Pages: {typeof plan.maxPages === 'number' ? plan.maxPages : plan.maxPages}
+                  </p>
+                </div>
+                
+                <ul className="space-y-3 mb-6">
+                  {plan.features.map((feature, index) => (
+                    <li key={index} className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-gray-600">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Button
+                  onClick={() => handleUpgrade(plan.id)}
+                  disabled={plan.current || upgradeLoading === plan.id}
+                  className={`w-full ${
+                    plan.current 
+                      ? 'bg-green-600 hover:bg-green-700' 
+                      : plan.popular 
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-gray-900 hover:bg-gray-800'
+                  }`}
+                  variant={plan.current ? "secondary" : "default"}
+                >
+                  {upgradeLoading === plan.id ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Upgrading...
+                    </div>
+                  ) : plan.current ? (
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Current Plan
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {plan.price === 0 ? 'Select Plan' : 'Upgrade Now'}
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* FAQ Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Frequently Asked Questions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <h4 className="font-semibold mb-2">Can I change my plan anytime?</h4>
-                <p className="text-sm text-muted-foreground">
-                  Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">What happens to my data if I downgrade?</h4>
-                <p className="text-sm text-muted-foreground">
-                  Your data is safe. However, you may lose access to some features and need to reduce your usage to fit the new plan limits.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Do you offer refunds?</h4>
-                <p className="text-sm text-muted-foreground">
-                  We offer a 30-day money-back guarantee for all paid plans. Contact support for assistance.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-2">Is there a setup fee?</h4>
-                <p className="text-sm text-muted-foreground">
-                  No setup fees. You only pay the monthly or annual subscription fee for your chosen plan.
-                </p>
-              </div>
+        {/* Additional Info */}
+        <div className="mt-12 text-center">
+          <div className="bg-blue-50 rounded-lg p-6">
+            <div className="flex justify-center mb-4">
+              <Shield className="h-8 w-8 text-blue-600" />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Support */}
-        <Card className="text-center">
-          <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-2">Need help choosing a plan?</h3>
-            <p className="text-muted-foreground mb-4">
-              Our team is here to help you find the perfect plan for your needs.
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Free Testing Environment
+            </h3>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              All plan upgrades are free for testing purposes. In a production environment, 
+              this would integrate with your payment processor for actual billing.
             </p>
-            <Button variant="outline">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Contact Sales
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default PlanManagement; 
+export default PlanManagement;

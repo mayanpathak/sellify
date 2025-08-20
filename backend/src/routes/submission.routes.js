@@ -1,11 +1,3 @@
-// import express from 'express';
-// const router = express.Router();
-
-// // As mentioned, submission logic is in `page.routes.js` for this MVP.
-// // This file is a placeholder.
-
-// export default router;
-
 
 
 import express from 'express';

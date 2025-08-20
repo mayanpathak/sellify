@@ -8,6 +8,13 @@ export const validateEnvironment = () => {
         'CLIENT_URL'
     ];
 
+    // Stripe-specific validation
+    const stripeVars = [
+        'STRIPE_SECRET_KEY',
+        'STRIPE_PUBLISHABLE_KEY',
+        'STRIPE_WEBHOOK_SECRET'
+    ];
+
     const optionalVars = {
         'JWT_EXPIRES_IN': '7d',
         'JWT_COOKIE_EXPIRES_IN': '7',
@@ -17,11 +24,19 @@ export const validateEnvironment = () => {
     };
 
     const missing = [];
+    const missingStripe = [];
     
     // Check required variables
     requiredVars.forEach(varName => {
         if (!process.env[varName]) {
             missing.push(varName);
+        }
+    });
+
+    // Check Stripe variables
+    stripeVars.forEach(varName => {
+        if (!process.env[varName]) {
+            missingStripe.push(varName);
         }
     });
 
@@ -34,6 +49,36 @@ export const validateEnvironment = () => {
         process.exit(1);
     }
 
+    if (missingStripe.length > 0) {
+        console.warn('⚠️  Missing Stripe environment variables:');
+        missingStripe.forEach(varName => {
+            console.warn(`   - ${varName}`);
+        });
+        console.warn('⚠️  Stripe functionality will be limited or use development fallbacks');
+        
+        // Only exit if in production
+        if (process.env.NODE_ENV === 'production') {
+            console.error('❌ Stripe environment variables are required in production');
+            process.exit(1);
+        }
+    }
+
+    // Validate Stripe key formats if they exist
+    if (process.env.STRIPE_SECRET_KEY && !process.env.STRIPE_SECRET_KEY.startsWith('sk_')) {
+        console.error('❌ Invalid STRIPE_SECRET_KEY format. Must start with "sk_"');
+        process.exit(1);
+    }
+
+    if (process.env.STRIPE_PUBLISHABLE_KEY && !process.env.STRIPE_PUBLISHABLE_KEY.startsWith('pk_')) {
+        console.error('❌ Invalid STRIPE_PUBLISHABLE_KEY format. Must start with "pk_"');
+        process.exit(1);
+    }
+
+    if (process.env.STRIPE_WEBHOOK_SECRET && !process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_')) {
+        console.error('❌ Invalid STRIPE_WEBHOOK_SECRET format. Must start with "whsec_"');
+        process.exit(1);
+    }
+
     // Set defaults for optional variables
     Object.entries(optionalVars).forEach(([varName, defaultValue]) => {
         if (!process.env[varName]) {
@@ -43,4 +88,7 @@ export const validateEnvironment = () => {
     });
 
     console.log('✅ Environment variables validated successfully');
+    if (missingStripe.length === 0) {
+        console.log('✅ Stripe environment variables configured');
+    }
 }; 

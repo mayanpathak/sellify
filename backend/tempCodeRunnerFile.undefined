@@ -1,1 +1,0 @@
-ALLOWED_ORIGINS=http://localhost:3000 || https://sellify-delta.vercel.app/ || https://sellify-o36c.onrender.com/

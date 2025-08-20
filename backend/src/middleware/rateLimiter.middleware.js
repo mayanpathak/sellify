@@ -25,16 +25,22 @@ export const authLimiter = rateLimit({
     skipSuccessfulRequests: true, // Don't count successful requests
 });
 
-// Page creation limiter
+// Page creation limiter - more lenient since we have plan-based limits
 export const createPageLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // Limit each IP to 10 page creations per hour
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.NODE_ENV === 'development' ? 50 : 10, // Higher limit for development/testing
     message: {
         status: 'error',
         message: 'Too many pages created, please try again later.',
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+        // Skip rate limiting in test environment if JWT_SECRET contains 'test'
+        return process.env.NODE_ENV === 'development' && 
+               process.env.JWT_SECRET && 
+               process.env.JWT_SECRET.includes('test');
+    }
 });
 
 // Submission rate limiter (more lenient for public submissions)

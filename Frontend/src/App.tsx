@@ -19,6 +19,8 @@ import Analytics from "./pages/Analytics";
 import PlanManagement from "./pages/PlanManagement";
 import StripeReturn from "./pages/StripeReturn";
 import StripeRefresh from "./pages/StripeRefresh";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -197,6 +199,26 @@ const AppContent = () => {
             <ProtectedRoute>
               <PageTransition>
                 <StripeRefresh />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/payment/success" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <PaymentSuccess />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/payment/failed" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <PaymentFailed />
               </PageTransition>
             </ProtectedRoute>
           } 

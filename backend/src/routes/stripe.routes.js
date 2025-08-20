@@ -4,7 +4,12 @@ import { protect } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
+// Stripe account connection routes
 router.post('/connect', protect, stripeController.connectAccount);
+router.get('/status', protect, stripeController.getConnectionStatus);
+router.delete('/disconnect', protect, stripeController.disconnectAccount);
+
+// Stripe session routes
 router.post('/session/:pageId', protect, stripeController.createSession);
 
 export default router;

@@ -1,9 +1,18 @@
 import User from '../models/user.model.js';
 
 const planLimits = {
-    free: { maxPages: 10 },
-    builder: { maxPages: 25 },
+    free: { maxPages: 3 },
+    builder: { maxPages: 10 },
     pro: { maxPages: Infinity }
+};
+
+/**
+ * Get plan limits for a specific plan
+ * @param {string} plan - The plan name
+ * @returns {object} Plan limits
+ */
+export const getPlanLimits = (plan) => {
+    return planLimits[plan] || planLimits.free;
 };
 
 /**
@@ -19,14 +28,7 @@ export const checkPlanLimits = (resourceType) => async (req, res, next) => {
             return res.status(401).json({ status: 'fail', message: 'User not found.' });
         }
 
-        // Check if trial has expired for free users
-        const now = new Date();
-        if (user.plan === 'free' && user.trialExpiresAt && now > user.trialExpiresAt) {
-            return res.status(403).json({
-                status: 'fail',
-                message: 'Your trial has expired. Please upgrade your plan to continue using the service.'
-            });
-        }
+        // No trial expiration check - only page limits matter
 
         const plan = user.plan || 'free';
         const limit = planLimits[plan]?.maxPages || planLimits.free.maxPages;
@@ -35,7 +37,11 @@ export const checkPlanLimits = (resourceType) => async (req, res, next) => {
             if (user.createdPages.length >= limit) {
                 return res.status(403).json({
                     status: 'fail',
-                    message: `You have reached the maximum of ${limit === Infinity ? 'unlimited' : limit} pages for the ${plan} plan. Please upgrade your plan to create more.`
+                    message: `You have reached the maximum of ${limit === Infinity ? 'unlimited' : limit} pages for the ${plan} plan. Please upgrade your plan to create more.`,
+                    code: 'PLAN_LIMIT_REACHED',
+                    currentPlan: plan,
+                    currentPages: user.createdPages.length,
+                    maxPages: limit
                 });
             }
         }

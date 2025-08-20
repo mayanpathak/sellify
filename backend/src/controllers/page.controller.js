@@ -1,6 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import CheckoutPage from '../models/CheckoutPage.js';
-import Submission from '../models/submission.model.js';
+import Submission from '../models/Submission.js';
 import User from '../models/user.model.js';
 import generateUniqueSlug from '../utils/slugify.js';
 

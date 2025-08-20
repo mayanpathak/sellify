@@ -1,5 +1,5 @@
 import asyncHandler from 'express-async-handler';
-import Submission from '../models/submission.model.js';
+import Submission from '../models/Submission.js';
 import CheckoutPage from '../models/CheckoutPage.js';
 
 /**
@@ -16,17 +16,23 @@ export const handleSubmission = asyncHandler(async (req, res) => {
         throw new Error('Checkout page not found.');
     }
 
+    // Extract IP and User Agent for tracking
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+
     const submission = await Submission.create({
         pageId: page._id,
         formData: req.body,
+        ipAddress,
+        userAgent,
     });
-
-    // Optionally, trigger webhooks, email notifications, etc. here
 
     res.status(201).json({
         status: 'success',
         message: 'Form submitted successfully.',
-        submissionId: submission._id,
+        data: {
+            submissionId: submission._id,
+        },
     });
 });
 

@@ -43,7 +43,7 @@ const CreatePage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canCreatePage, usage, limits, isTrialExpired } = usePlanLimits();
+  const { canCreatePage, usage, limits } = usePlanLimits();
 
   const isStripeConnected = !!user?.stripeAccountId;
 
@@ -74,10 +74,29 @@ const CreatePage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.productName || !formData.price) {
+    if (!canCreatePage) {
+      toast({
+        title: "Plan Limit Reached",
+        description: "Please upgrade your plan to create more pages.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Enhanced validation
+    const errors = [];
+    if (!formData.title.trim()) errors.push("Page title is required");
+    if (!formData.productName.trim()) errors.push("Product name is required");
+    if (!formData.price || parseFloat(formData.price) <= 0) errors.push("Valid price is required");
+    
+    // Validate fields
+    const validFields = fields.filter(field => field.label.trim() !== '');
+    if (validFields.length === 0) errors.push("At least one form field is required");
+    
+    if (errors.length > 0) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: errors.join(", "),
         variant: "destructive",
       });
       return;
@@ -101,10 +120,23 @@ const CreatePage = () => {
         });
         navigate('/dashboard');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Page creation error:', error);
+      
+      let errorMessage = "Failed to create page";
+      
+      // Handle specific error cases
+      if (error.response?.data?.code === 'PLAN_LIMIT_REACHED') {
+        errorMessage = `Plan limit reached: ${error.response.data.message}`;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create page",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -115,13 +147,26 @@ const CreatePage = () => {
   const handleStripeConnect = async () => {
     try {
       const response = await stripeApi.connectAccount();
-      if (response.data?.onboardingUrl) {
+      
+      if (response.data?.alreadyConnected) {
+        toast({
+          title: "Already Connected",
+          description: response.data.message,
+        });
+        // Refresh the user context to update the UI
+        window.location.reload();
+      } else if (response.data?.onboardingUrl) {
+        toast({
+          title: "Redirecting to Stripe",
+          description: "Complete your Stripe setup to enable payments",
+        });
         window.location.href = response.data.onboardingUrl;
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Stripe connection error:', error);
       toast({
         title: "Error",
-        description: "Failed to connect Stripe account. Please try again.",
+        description: error.response?.data?.message || "Failed to connect Stripe account. Please try again.",
         variant: "destructive",
       });
     }
@@ -150,20 +195,10 @@ const CreatePage = () => {
         {/* Plan Limit Warning */}
         {!canCreatePage && (
           <PlanUpgradePrompt
-            feature="Page Limit Reached"
-            description={`You've reached your plan limit of ${limits.maxPages} pages. Upgrade to create more checkout pages.`}
-            variant="warning"
-            className="mb-6"
-          />
-        )}
-
-        {/* Trial Expiration Warning */}
-        {isTrialExpired && (
-          <PlanUpgradePrompt
-            feature="Trial Expired"
-            description="Your trial has expired. Upgrade now to continue creating and managing checkout pages."
-            variant="warning"
-            className="mb-6"
+            currentPlan={user?.plan || 'free'}
+            pagesUsed={usage.pagesUsed}
+            maxPages={limits.maxPages}
+            showInline={true}
           />
         )}
 
@@ -204,10 +239,10 @@ const CreatePage = () => {
                   Cannot Create New Page
                 </h3>
                 <p className="text-gray-500 mb-6">
-                  You've reached your plan limit or your trial has expired. Please upgrade your plan to continue.
+                  You've reached your plan limit of {limits.maxPages} pages. Please upgrade your plan to continue.
                 </p>
-                <Button onClick={() => navigate('/plans')}>
-                  View Plans
+                <Button onClick={() => navigate('/plan-management')}>
+                  Upgrade Plan
                 </Button>
               </CardContent>
             </Card>

@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { apiClient } from '../lib/api';
+import { planApi } from '../lib/api';
 
 interface PlanLimits {
   maxPages: number;
-  maxSubmissions?: number;
   hasAdvancedAnalytics: boolean;
   hasCustomBranding: boolean;
   hasPrioritySupport: boolean;
@@ -14,7 +13,7 @@ interface PlanLimits {
 interface UsageStats {
   pagesUsed: number;
   submissionsCount: number;
-  pagesRemaining: number;
+  pagesRemaining: number | string;
   usagePercentage: number;
   isNearLimit: boolean;
   isAtLimit: boolean;
@@ -25,21 +24,19 @@ interface PlanLimitsHook {
   usage: UsageStats;
   loading: boolean;
   canCreatePage: boolean;
-  trialDaysLeft: number;
-  isTrialExpired: boolean;
   refreshUsage: () => Promise<void>;
 }
 
 const PLAN_CONFIGS: Record<string, PlanLimits> = {
   free: {
-    maxPages: 10,
+    maxPages: 3,
     hasAdvancedAnalytics: false,
     hasCustomBranding: false,
     hasPrioritySupport: false,
     hasAPIAccess: false
   },
   builder: {
-    maxPages: 25,
+    maxPages: 10,
     hasAdvancedAnalytics: true,
     hasCustomBranding: true,
     hasPrioritySupport: true,
@@ -72,28 +69,27 @@ export const usePlanLimits = (): PlanLimitsHook => {
   const fetchUsage = async () => {
     try {
       setLoading(true);
-      const [pagesResponse, submissionsResponse] = await Promise.all([
-        apiClient.getUserPages(),
-        apiClient.getUserSubmissions()
-      ]);
-
-      const pagesUsed = pagesResponse.data?.pages?.length || 0;
-      const submissionsCount = submissionsResponse.data?.submissions?.length || 0;
-      const pagesRemaining = limits.maxPages === Infinity ? Infinity : Math.max(0, limits.maxPages - pagesUsed);
-      const usagePercentage = limits.maxPages === Infinity ? 0 : (pagesUsed / limits.maxPages) * 100;
-      const isNearLimit = usagePercentage >= 80;
-      const isAtLimit = pagesUsed >= limits.maxPages;
-
+      const response = await planApi.getPlanUsage();
+      
       setUsage({
-        pagesUsed,
-        submissionsCount,
-        pagesRemaining,
-        usagePercentage,
-        isNearLimit,
-        isAtLimit
+        pagesUsed: response.data.usage.pagesUsed,
+        submissionsCount: 0, // We don't track submissions in plan usage anymore
+        pagesRemaining: response.data.usage.pagesRemaining,
+        usagePercentage: response.data.usage.usagePercentage,
+        isNearLimit: response.data.usage.isNearLimit,
+        isAtLimit: response.data.usage.isAtLimit
       });
     } catch (error) {
       console.error('Failed to fetch usage stats:', error);
+      // Fallback to old method if new API fails
+      setUsage({
+        pagesUsed: 0,
+        submissionsCount: 0,
+        pagesRemaining: limits.maxPages === Infinity ? 'Unlimited' : limits.maxPages,
+        usagePercentage: 0,
+        isNearLimit: false,
+        isAtLimit: false
+      });
     } finally {
       setLoading(false);
     }
@@ -105,20 +101,6 @@ export const usePlanLimits = (): PlanLimitsHook => {
     }
   }, [user, plan]);
 
-  const getTrialDaysLeft = (): number => {
-    if (!user?.trialExpiresAt) return 0;
-    const now = new Date();
-    const trialEnd = new Date(user.trialExpiresAt);
-    const diffTime = trialEnd.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
-
-  const isTrialExpired = (): boolean => {
-    if (!user?.trialExpiresAt) return false;
-    return new Date() > new Date(user.trialExpiresAt);
-  };
-
   const canCreatePage = !usage.isAtLimit || plan === 'pro';
 
   return {
@@ -126,8 +108,6 @@ export const usePlanLimits = (): PlanLimitsHook => {
     usage,
     loading,
     canCreatePage,
-    trialDaysLeft: getTrialDaysLeft(),
-    isTrialExpired: isTrialExpired(),
     refreshUsage: fetchUsage
   };
-}; 
+};

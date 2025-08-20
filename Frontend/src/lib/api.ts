@@ -221,8 +221,34 @@ class ApiClient {
 
   // Stripe Methods
   async connectStripeAccount() {
-    return this.request<{ stripeAccountId: string; onboardingUrl: string }>('/api/stripe/connect', {
+    return this.request<{ 
+      stripeAccountId: string; 
+      onboardingUrl?: string; 
+      alreadyConnected?: boolean;
+      message: string;
+    }>('/api/stripe/connect', {
       method: 'POST',
+    });
+  }
+
+  async getStripeConnectionStatus() {
+    return this.request<{
+      connected: boolean;
+      accountId: string | null;
+      details: {
+        charges_enabled?: boolean;
+        payouts_enabled?: boolean;
+        details_submitted?: boolean;
+        requirements?: any;
+        mock?: boolean;
+      } | null;
+      error?: string;
+    }>('/api/stripe/status');
+  }
+
+  async disconnectStripeAccount() {
+    return this.request<{ message: string }>('/api/stripe/disconnect', {
+      method: 'DELETE',
     });
   }
 
@@ -230,6 +256,95 @@ class ApiClient {
     return this.request<{ url: string; sessionId: string }>(`/api/stripe/session/${pageId}`, {
       method: 'POST',
     });
+  }
+
+    async getStripeAccountStatus() {
+    return this.request<{
+      connected: boolean;
+      accountId: string | null;
+      details: any;
+    }>('/api/analytics/stripe-status');
+  }
+
+  // Plan management
+  async getPlans() {
+    return this.request<{
+      plans: Array<{
+        id: string;
+        name: string;
+        description: string;
+        maxPages: number | string;
+        price: number;
+        features: string[];
+        popular?: boolean;
+        current: boolean;
+      }>;
+      currentPlan: {
+        id: string;
+        maxPages: number;
+        pagesUsed: number;
+        pagesRemaining: number | string;
+        usagePercentage: number;
+      };
+    }>('/api/plans');
+  }
+
+  async upgradePlan(planId: string) {
+    return this.request<{
+      message: string;
+      user: User;
+    }>('/api/plans/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ planId }),
+    });
+  }
+
+  async getPlanUsage() {
+    return this.request<{
+      plan: string;
+      limits: {
+        maxPages: number;
+      };
+      usage: {
+        pagesUsed: number;
+        pagesRemaining: number | string;
+        usagePercentage: number;
+        isNearLimit: boolean;
+        isAtLimit: boolean;
+      };
+    }>('/api/plans/usage');
+  }
+
+  // Analytics Methods
+  async getPaymentAnalytics() {
+    return this.request<{
+      stats: any;
+      recentPayments: any[];
+      monthlyRevenue: any[];
+      totalRevenue: number;
+      totalTransactions: number;
+    }>('/api/analytics/payments');
+  }
+
+  async getPageAnalytics(pageId: string) {
+    return this.request<{
+      page: any;
+      paymentStats: any[];
+      submissionStats: any[];
+      conversionRate: number;
+      totalSubmissions: number;
+      totalPayments: number;
+      recentPayments: any[];
+      recentSubmissions: any[];
+    }>(`/api/analytics/pages/${pageId}`);
+  }
+
+  async getPaymentStatus(sessionId?: string, pageId?: string) {
+    const params = new URLSearchParams();
+    if (sessionId) params.append('sessionId', sessionId);
+    if (pageId) params.append('pageId', pageId);
+    
+    return this.request<{ payment: any }>(`/api/analytics/payments/status?${params.toString()}`);
   }
 }
 
@@ -264,5 +379,20 @@ export const submissionsApi = {
 
 export const stripeApi = {
   connectAccount: () => apiClient.connectStripeAccount(),
+  getConnectionStatus: () => apiClient.getStripeConnectionStatus(),
+  disconnectAccount: () => apiClient.disconnectStripeAccount(),
   createSession: (pageId: string) => apiClient.createCheckoutSession(pageId),
+  getAccountStatus: () => apiClient.getStripeAccountStatus(), // Keep for backward compatibility
+};
+
+export const analyticsApi = {
+  getPaymentAnalytics: () => apiClient.getPaymentAnalytics(),
+  getPageAnalytics: (pageId: string) => apiClient.getPageAnalytics(pageId),
+  getPaymentStatus: (sessionId?: string, pageId?: string) => apiClient.getPaymentStatus(sessionId, pageId),
+};
+
+export const planApi = {
+  getPlans: () => apiClient.getPlans(),
+  upgradePlan: (planId: string) => apiClient.upgradePlan(planId),
+  getPlanUsage: () => apiClient.getPlanUsage(),
 }; 
