@@ -258,6 +258,23 @@ class ApiClient {
     });
   }
 
+  // Public checkout session creation (no auth required)
+  async createPublicCheckoutSession(pageId: string) {
+    const response = await fetch(`${this.baseURL}/api/stripe/session/${pageId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Network error' }));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
     async getStripeAccountStatus() {
     return this.request<{
       connected: boolean;
@@ -382,6 +399,7 @@ export const stripeApi = {
   getConnectionStatus: () => apiClient.getStripeConnectionStatus(),
   disconnectAccount: () => apiClient.disconnectStripeAccount(),
   createSession: (pageId: string) => apiClient.createCheckoutSession(pageId),
+  createPublicSession: (pageId: string) => apiClient.createPublicCheckoutSession(pageId),
   getAccountStatus: () => apiClient.getStripeAccountStatus(), // Keep for backward compatibility
 };
 

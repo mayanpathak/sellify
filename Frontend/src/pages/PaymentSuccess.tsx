@@ -42,9 +42,36 @@ const PaymentSuccess: React.FC = () => {
 
   const fetchPaymentDetails = async () => {
     try {
+      const authToken = localStorage.getItem('authToken');
+      
+      if (!authToken) {
+        // For public users, show a generic success message
+        setPaymentDetails({
+          sessionId: sessionId!,
+          amount: 0, // We don't know the amount without auth
+          currency: 'usd',
+          status: 'completed',
+          customerEmail: null,
+          customerName: null,
+          createdAt: new Date().toISOString(),
+          pageId: {
+            title: 'Purchase',
+            productName: 'Product'
+          }
+        });
+        
+        toast({
+          title: "Payment Successful! 🎉",
+          description: "Your payment has been processed successfully. You should receive a confirmation email shortly.",
+        });
+        
+        setLoading(false);
+        return;
+      }
+      
       const response = await fetch(`/api/analytics/payments/status?sessionId=${sessionId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 

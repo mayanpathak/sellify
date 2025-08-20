@@ -9,7 +9,7 @@ router.post('/connect', protect, stripeController.connectAccount);
 router.get('/status', protect, stripeController.getConnectionStatus);
 router.delete('/disconnect', protect, stripeController.disconnectAccount);
 
-// Stripe session routes
-router.post('/session/:pageId', protect, stripeController.createSession);
+// Stripe session routes (public - anyone can pay)
+router.post('/session/:pageId', stripeController.createSession);
 
 export default router;

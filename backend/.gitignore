@@ -3,3 +3,30 @@
    echo *.log >> .gitignore
    echo dist/ >> .gitignore
    echo build/ >> .gitignore
+   # Node.js dependencies
+node_modules/
+
+# Environment files
+.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Optional lock files
+package-lock.json
+yarn.lock

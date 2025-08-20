@@ -206,21 +206,17 @@ const AppContent = () => {
         <Route 
           path="/payment/success" 
           element={
-            <ProtectedRoute>
-              <PageTransition>
-                <PaymentSuccess />
-              </PageTransition>
-            </ProtectedRoute>
+            <PageTransition>
+              <PaymentSuccess />
+            </PageTransition>
           } 
         />
         <Route 
           path="/payment/failed" 
           element={
-            <ProtectedRoute>
-              <PageTransition>
-                <PaymentFailed />
-              </PageTransition>
-            </ProtectedRoute>
+            <PageTransition>
+              <PaymentFailed />
+            </PageTransition>
           } 
         />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

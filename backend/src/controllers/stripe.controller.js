@@ -140,14 +140,23 @@ export const disconnectAccount = asyncHandler(async (req, res) => {
 /**
  * @desc    Create a Stripe Checkout Session
  * @route   POST /api/stripe/session/:pageId
- * @access  Private
+ * @access  Public (anyone can pay)
  */
 export const createSession = asyncHandler(async (req, res) => {
     const { pageId } = req.params;
 
+    // Get the page to find the owner (seller)
+    const CheckoutPage = (await import('../models/CheckoutPage.js')).default;
+    const page = await CheckoutPage.findById(pageId);
+    
+    if (!page) {
+        res.status(404);
+        throw new Error('Checkout page not found.');
+    }
+
     const result = await stripeService.createCheckoutSession({
         pageId,
-        userId: req.user._id || req.user.id,
+        userId: page.userId, // Use the page owner's userId (seller)
     });
 
     res.status(200).json({

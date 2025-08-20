@@ -88,8 +88,8 @@ const CheckoutPage = () => {
       await submissionsApi.submit(slug!, formData);
       
       if (isStripeConnected) {
-        // Create Stripe checkout session if connected
-        const stripeResponse = await stripeApi.createSession(page._id);
+        // Create Stripe checkout session if connected (public - no auth required)
+        const stripeResponse = await stripeApi.createPublicSession(page._id);
         
         if (stripeResponse.data?.url) {
           // Redirect to Stripe checkout
