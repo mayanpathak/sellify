@@ -16,6 +16,7 @@ import webhookRoutes from './routes/webhook.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import planRoutes from './routes/plan.routes.js';
 import { submissionMainRouter } from './routes/submission.routes.js';
+import { completeMockPayment } from './controllers/webhook.controller.js';
 
 // --- Initialize Express App ---
 const app = express();
@@ -79,6 +80,9 @@ app.use('/api/webhooks', webhookRoutes);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
+
+// --- Mock payment completion route (after JSON parser) ---
+app.post('/api/webhooks/mock-payment-complete', completeMockPayment);
 
 // --- Health Check Route ---
 app.get('/', (req, res) => {
