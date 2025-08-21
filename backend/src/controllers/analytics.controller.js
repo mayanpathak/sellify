@@ -302,3 +302,346 @@ export const getStripeAccountStatus = asyncHandler(async (req, res) => {
         });
     }
 });
+
+/**
+ * @desc    Get comprehensive dashboard analytics
+ * @route   GET /api/analytics/dashboard
+ * @access  Private
+ */
+export const getDashboardAnalytics = asyncHandler(async (req, res) => {
+    const userId = req.user._id || req.user.id;
+    const { days = 30 } = req.query;
+
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - parseInt(days));
+
+        // Get all user's pages
+        const userPages = await CheckoutPage.find({ userId }).select('_id title slug productName price currency');
+        const pageIds = userPages.map(page => page._id);
+
+        // Get comprehensive analytics in parallel
+        const [
+            paymentStats,
+            submissionStats,
+            recentPayments,
+            recentSubmissions,
+            monthlyRevenue,
+            topPerformingPages,
+            conversionRates,
+            revenueByPage
+        ] = await Promise.all([
+            // Payment statistics
+            Payment.aggregate([
+                { $match: { userId: new mongoose.Types.ObjectId(userId) } },
+                {
+                    $group: {
+                        _id: '$status',
+                        count: { $sum: 1 },
+                        totalAmount: { $sum: '$amount' }
+                    }
+                }
+            ]),
+
+            // Submission statistics
+            Submission.aggregate([
+                { $match: { pageId: { $in: pageIds } } },
+                {
+                    $group: {
+                        _id: '$paymentStatus',
+                        count: { $sum: 1 }
+                    }
+                }
+            ]),
+
+            // Recent payments
+            Payment.find({ userId })
+                .populate('pageId', 'title productName')
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean(),
+
+            // Recent submissions
+            Submission.find({ pageId: { $in: pageIds } })
+                .populate('pageId', 'title productName')
+                .sort({ createdAt: -1 })
+                .limit(10)
+                .lean(),
+
+            // Monthly revenue trend
+            Payment.aggregate([
+                { 
+                    $match: { 
+                        userId: new mongoose.Types.ObjectId(userId),
+                        status: 'completed',
+                        paymentCompletedAt: {
+                            $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: {
+                            year: { $year: '$paymentCompletedAt' },
+                            month: { $month: '$paymentCompletedAt' }
+                        },
+                        revenue: { $sum: '$amount' },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ]),
+
+            // Top performing pages by revenue
+            Payment.aggregate([
+                { 
+                    $match: { 
+                        userId: new mongoose.Types.ObjectId(userId),
+                        status: 'completed'
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$pageId',
+                        revenue: { $sum: '$amount' },
+                        transactionCount: { $sum: 1 }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'checkoutpages',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'page'
+                    }
+                },
+                { $unwind: '$page' },
+                {
+                    $project: {
+                        pageTitle: '$page.title',
+                        pageSlug: '$page.slug',
+                        revenue: 1,
+                        transactionCount: 1
+                    }
+                },
+                { $sort: { revenue: -1 } },
+                { $limit: 10 }
+            ]),
+
+            // Conversion rates by page
+            Submission.aggregate([
+                { $match: { pageId: { $in: pageIds } } },
+                {
+                    $group: {
+                        _id: '$pageId',
+                        totalSubmissions: { $sum: 1 },
+                        completedSubmissions: {
+                            $sum: { $cond: [{ $eq: ['$paymentStatus', 'completed'] }, 1, 0] }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'checkoutpages',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'page'
+                    }
+                },
+                { $unwind: '$page' },
+                {
+                    $project: {
+                        pageTitle: '$page.title',
+                        pageSlug: '$page.slug',
+                        totalSubmissions: 1,
+                        completedSubmissions: 1,
+                        conversionRate: {
+                            $cond: [
+                                { $gt: ['$totalSubmissions', 0] },
+                                { $multiply: [{ $divide: ['$completedSubmissions', '$totalSubmissions'] }, 100] },
+                                0
+                            ]
+                        }
+                    }
+                }
+            ]),
+
+            // Revenue by page for pie chart
+            Payment.aggregate([
+                { 
+                    $match: { 
+                        userId: new mongoose.Types.ObjectId(userId),
+                        status: 'completed'
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$pageId',
+                        revenue: { $sum: '$amount' }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'checkoutpages',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'page'
+                    }
+                },
+                { $unwind: '$page' },
+                {
+                    $project: {
+                        name: '$page.title',
+                        value: '$revenue'
+                    }
+                }
+            ])
+        ]);
+
+        // Format payment stats
+        const formattedPaymentStats = {
+            completed: { count: 0, totalAmount: 0 },
+            pending: { count: 0, totalAmount: 0 },
+            failed: { count: 0, totalAmount: 0 }
+        };
+
+        paymentStats.forEach(stat => {
+            if (formattedPaymentStats[stat._id]) {
+                formattedPaymentStats[stat._id] = {
+                    count: stat.count,
+                    totalAmount: stat.totalAmount
+                };
+            }
+        });
+
+        // Format submission stats
+        const formattedSubmissionStats = {
+            completed: 0,
+            pending: 0,
+            none: 0
+        };
+
+        submissionStats.forEach(stat => {
+            if (formattedSubmissionStats[stat._id] !== undefined) {
+                formattedSubmissionStats[stat._id] = stat.count;
+            }
+        });
+
+        // Calculate totals and rates
+        const totalRevenue = formattedPaymentStats.completed.totalAmount;
+        const totalTransactions = formattedPaymentStats.completed.count + formattedPaymentStats.pending.count + formattedPaymentStats.failed.count;
+        const totalSubmissions = formattedSubmissionStats.completed + formattedSubmissionStats.pending + formattedSubmissionStats.none;
+        const overallConversionRate = totalSubmissions > 0 ? (formattedSubmissionStats.completed / totalSubmissions) * 100 : 0;
+        const averageOrderValue = formattedPaymentStats.completed.count > 0 ? totalRevenue / formattedPaymentStats.completed.count : 0;
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                summary: {
+                    totalRevenue,
+                    totalTransactions,
+                    totalSubmissions,
+                    totalPages: userPages.length,
+                    overallConversionRate: Math.round(overallConversionRate * 100) / 100,
+                    averageOrderValue
+                },
+                paymentStats: formattedPaymentStats,
+                submissionStats: formattedSubmissionStats,
+                recentPayments,
+                recentSubmissions,
+                monthlyRevenue,
+                topPerformingPages,
+                conversionRates,
+                revenueByPage,
+                pages: userPages
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching dashboard analytics:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch dashboard analytics'
+        });
+    }
+});
+
+/**
+ * @desc    Get revenue analytics with time series data
+ * @route   GET /api/analytics/revenue
+ * @access  Private
+ */
+export const getRevenueAnalytics = asyncHandler(async (req, res) => {
+    const userId = req.user._id || req.user.id;
+    const { period = 'monthly', days = 365 } = req.query;
+
+    try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - parseInt(days));
+
+        let groupBy;
+        let dateFormat;
+
+        switch (period) {
+            case 'daily':
+                groupBy = {
+                    year: { $year: '$paymentCompletedAt' },
+                    month: { $month: '$paymentCompletedAt' },
+                    day: { $dayOfMonth: '$paymentCompletedAt' }
+                };
+                dateFormat = "%Y-%m-%d";
+                break;
+            case 'weekly':
+                groupBy = {
+                    year: { $year: '$paymentCompletedAt' },
+                    week: { $week: '$paymentCompletedAt' }
+                };
+                dateFormat = "%Y-W%V";
+                break;
+            case 'monthly':
+            default:
+                groupBy = {
+                    year: { $year: '$paymentCompletedAt' },
+                    month: { $month: '$paymentCompletedAt' }
+                };
+                dateFormat = "%Y-%m";
+                break;
+        }
+
+        const revenueData = await Payment.aggregate([
+            {
+                $match: {
+                    userId: new mongoose.Types.ObjectId(userId),
+                    status: 'completed',
+                    paymentCompletedAt: { $gte: startDate }
+                }
+            },
+            {
+                $group: {
+                    _id: groupBy,
+                    revenue: { $sum: '$amount' },
+                    transactionCount: { $sum: 1 },
+                    averageOrderValue: { $avg: '$amount' }
+                }
+            },
+            { $sort: { '_id': 1 } }
+        ]);
+
+        res.status(200).json({
+            status: 'success',
+            data: {
+                revenueData,
+                period,
+                totalRevenue: revenueData.reduce((sum, item) => sum + item.revenue, 0),
+                totalTransactions: revenueData.reduce((sum, item) => sum + item.transactionCount, 0)
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching revenue analytics:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to fetch revenue analytics'
+        });
+    }
+});

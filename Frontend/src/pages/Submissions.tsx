@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Filter, Search } from 'lucide-react';
+import { ArrowLeft, Download, Filter, Search, Settings, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,14 +131,24 @@ const Submissions = () => {
               <h1 className="text-2xl font-bold text-gray-900">Form Submissions</h1>
             </div>
             
-            <Button
-              onClick={exportSubmissions}
-              disabled={submissions.length === 0}
-              variant="outline"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/submissions/manage')}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Advanced Management
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+              <Button
+                onClick={exportSubmissions}
+                disabled={submissions.length === 0}
+                variant="outline"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
           </div>
         </div>
       </header>

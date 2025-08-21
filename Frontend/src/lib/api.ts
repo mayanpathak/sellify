@@ -184,8 +184,9 @@ class ApiClient {
     });
   }
 
-  async getUserPages() {
-    return this.request<{ pages: CheckoutPage[] }>('/api/pages');
+  async getUserPages(includeStats?: boolean) {
+    const endpoint = `/api/pages${includeStats ? '?includeStats=true' : ''}`;
+    return this.request<{ pages: CheckoutPage[] }>(endpoint);
   }
 
   async getPageBySlug(slug: string) {
@@ -201,6 +202,20 @@ class ApiClient {
 
   async deletePage(id: string) {
     return this.request(`/api/pages/${id}`, { method: 'DELETE' });
+  }
+
+  // Enhanced page management methods
+  async getPageAnalytics(pageId: string, days?: number) {
+    const endpoint = `/api/pages/${pageId}/analytics${days ? `?days=${days}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async duplicatePage(pageId: string) {
+    return this.request(`/api/pages/${pageId}/duplicate`, { method: 'POST' });
+  }
+
+  async togglePageStatus(pageId: string) {
+    return this.request(`/api/pages/${pageId}/toggle-status`, { method: 'PATCH' });
   }
 
   // Submissions Methods
@@ -283,6 +298,21 @@ class ApiClient {
     }>('/api/analytics/stripe-status');
   }
 
+  // Enhanced analytics methods
+  async getDashboardAnalytics(days?: number) {
+    const endpoint = `/api/analytics/dashboard${days ? `?days=${days}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async getRevenueAnalytics(period?: string, days?: number) {
+    const params = new URLSearchParams();
+    if (period) params.append('period', period);
+    if (days) params.append('days', days.toString());
+    
+    const endpoint = `/api/analytics/revenue${params.toString() ? `?${params.toString()}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
   // Plan management
   async getPlans() {
     return this.request<{
@@ -343,7 +373,7 @@ class ApiClient {
     }>('/api/analytics/payments');
   }
 
-  async getPageAnalytics(pageId: string) {
+  async getPageAnalyticsOld(pageId: string) {
     return this.request<{
       page: any;
       paymentStats: any[];
@@ -363,6 +393,91 @@ class ApiClient {
     
     return this.request<{ payment: any }>(`/api/analytics/payments/status?${params.toString()}`);
   }
+
+  // Webhook management methods
+  async getWebhookEvents(params?: { page?: number; limit?: number; eventType?: string; status?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.eventType) queryParams.append('eventType', params.eventType);
+    if (params?.status) queryParams.append('status', params.status);
+    
+    const endpoint = `/api/webhooks/events${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async getWebhookEventDetails(eventId: string) {
+    return this.request(`/api/webhooks/events/${eventId}`, { method: 'GET' });
+  }
+
+  async getWebhookStats(days?: number) {
+    const endpoint = `/api/webhooks/stats${days ? `?days=${days}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  // Enhanced submission management methods
+  async getUserSubmissionsWithFilters(params?: { 
+    page?: number; 
+    limit?: number; 
+    pageId?: string; 
+    paymentStatus?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.pageId) queryParams.append('pageId', params.pageId);
+    if (params?.paymentStatus) queryParams.append('paymentStatus', params.paymentStatus);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    
+    const endpoint = `/api/submissions${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async getSubmissionDetails(submissionId: string) {
+    return this.request(`/api/submissions/${submissionId}`, { method: 'GET' });
+  }
+
+  async getSubmissionStats(days?: number) {
+    const endpoint = `/api/submissions/stats${days ? `?days=${days}` : ''}`;
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async exportSubmissions(params?: { pageId?: string; startDate?: string; endDate?: string; format?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.pageId) queryParams.append('pageId', params.pageId);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.format) queryParams.append('format', params.format);
+    
+    const endpoint = `/api/submissions/export${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    
+    // For CSV export, we need to handle the response differently
+    if (params?.format === 'csv') {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+
+      return response.blob();
+    }
+    
+    return this.request(endpoint, { method: 'GET' });
+  }
 }
 
 // Create and export API client instance
@@ -380,18 +495,36 @@ export const authApi = {
 
 export const pagesApi = {
   create: (pageData: Partial<CheckoutPage>) => apiClient.createPage(pageData),
-  getUserPages: () => apiClient.getUserPages(),
+  getUserPages: (includeStats?: boolean) => apiClient.getUserPages(includeStats),
   getBySlug: (slug: string) => apiClient.getPageBySlug(slug),
   update: (id: string, pageData: Partial<CheckoutPage>) =>
     apiClient.updatePage(id, pageData),
   delete: (id: string) => apiClient.deletePage(id),
+  getAnalytics: (pageId: string, days?: number) => apiClient.getPageAnalytics(pageId, days),
+  duplicate: (pageId: string) => apiClient.duplicatePage(pageId),
+  toggleStatus: (pageId: string) => apiClient.togglePageStatus(pageId),
 };
 
 export const submissionsApi = {
   submit: (slug: string, formData: Record<string, any>) =>
     apiClient.submitForm(slug, formData),
   getUserSubmissions: () => apiClient.getUserSubmissions(),
+  getUserSubmissionsWithFilters: (params?: { 
+    page?: number; 
+    limit?: number; 
+    pageId?: string; 
+    paymentStatus?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }) => apiClient.getUserSubmissionsWithFilters(params),
   getPageSubmissions: (pageId: string) => apiClient.getPageSubmissions(pageId),
+  getSubmissionDetails: (submissionId: string) => apiClient.getSubmissionDetails(submissionId),
+  getSubmissionStats: (days?: number) => apiClient.getSubmissionStats(days),
+  exportSubmissions: (params?: { pageId?: string; startDate?: string; endDate?: string; format?: string }) =>
+    apiClient.exportSubmissions(params),
 };
 
 export const stripeApi = {
@@ -404,13 +537,25 @@ export const stripeApi = {
 };
 
 export const analyticsApi = {
+  getDashboard: (days?: number) => apiClient.getDashboardAnalytics(days),
   getPaymentAnalytics: () => apiClient.getPaymentAnalytics(),
-  getPageAnalytics: (pageId: string) => apiClient.getPageAnalytics(pageId),
+  getPageAnalytics: (pageId: string) => apiClient.getPageAnalyticsOld(pageId),
+  getRevenueAnalytics: (period?: string, days?: number) => apiClient.getRevenueAnalytics(period, days),
   getPaymentStatus: (sessionId?: string, pageId?: string) => apiClient.getPaymentStatus(sessionId, pageId),
+  getStripeStatus: () => apiClient.getStripeAccountStatus(),
 };
 
 export const planApi = {
   getPlans: () => apiClient.getPlans(),
   upgradePlan: (planId: string) => apiClient.upgradePlan(planId),
   getPlanUsage: () => apiClient.getPlanUsage(),
+};
+
+export const webhookApi = {
+  getEvents: (params?: { page?: number; limit?: number; eventType?: string; status?: string }) => 
+    apiClient.getWebhookEvents(params),
+  getEventDetails: (eventId: string) => 
+    apiClient.getWebhookEventDetails(eventId),
+  getStats: (days?: number) => 
+    apiClient.getWebhookStats(days),
 }; 

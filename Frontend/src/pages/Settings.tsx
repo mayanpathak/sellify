@@ -6,9 +6,11 @@ import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { Separator } from '../components/ui/separator';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Crown, Calendar, CreditCard, BarChart3, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Crown, Calendar, CreditCard, BarChart3, AlertTriangle, CheckCircle, Zap, ExternalLink, Webhook } from 'lucide-react';
 import { apiClient } from '../lib/api';
 import { toast } from '../hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import StripeConnectionCard from '../components/StripeConnectionCard';
 
 interface UserStats {
   totalPages: number;
@@ -21,8 +23,10 @@ interface UserStats {
 
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stripeConnected, setStripeConnected] = useState(false);
 
   useEffect(() => {
     fetchUserStats();
@@ -233,6 +237,57 @@ const Settings: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Stripe Payment Management */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Payment Settings</h2>
+              <p className="text-muted-foreground">Manage your Stripe integration for payment processing</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/stripe/manage')}
+              className="flex items-center gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Advanced Stripe Management
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <StripeConnectionCard 
+            onConnectionChange={(connected) => setStripeConnected(connected)}
+          />
+
+          {/* Webhook Management Link */}
+          {stripeConnected && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Webhook className="h-6 w-6 text-blue-600" />
+                    <div>
+                      <h3 className="font-semibold text-blue-900">Webhook Events</h3>
+                      <p className="text-sm text-blue-700">
+                        Monitor and debug webhook events from Stripe
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/webhooks/manage')}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                  >
+                    <Webhook className="h-4 w-4 mr-2" />
+                    View Webhook Logs
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Plan Management */}

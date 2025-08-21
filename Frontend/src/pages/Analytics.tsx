@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Download, Filter, TrendingUp, Users, FileText, Calendar, Search, Eye } from 'lucide-react';
+import { Download, Filter, TrendingUp, Users, FileText, Calendar, Search, Eye, Settings, ExternalLink, BarChart3 } from 'lucide-react';
 import { apiClient, CheckoutPage, Submission } from '../lib/api';
 import { toast } from '../hooks/use-toast';
 
@@ -34,6 +35,7 @@ interface AnalyticsData {
 }
 
 const Analytics: React.FC = () => {
+  const navigate = useNavigate();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [pages, setPages] = useState<CheckoutPage[]>([]);
@@ -192,10 +194,21 @@ const Analytics: React.FC = () => {
             <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
             <p className="text-muted-foreground">Track your form submissions and performance</p>
           </div>
-          <Button onClick={exportSubmissions} className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Export Data
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => navigate('/analytics/manage')}
+              className="flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Advanced Analytics
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+            <Button onClick={exportSubmissions} className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export Data
+            </Button>
+          </div>
         </div>
 
         {/* Key Metrics */}

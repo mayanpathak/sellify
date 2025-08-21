@@ -19,6 +19,11 @@ import Analytics from "./pages/Analytics";
 import PlanManagement from "./pages/PlanManagement";
 import StripeReturn from "./pages/StripeReturn";
 import StripeRefresh from "./pages/StripeRefresh";
+import StripeManagement from "./pages/StripeManagement";
+import WebhookManagement from "./pages/WebhookManagement";
+import SubmissionManagement from "./pages/SubmissionManagement";
+import PageManagement from "./pages/PageManagement";
+import AnalyticsManagement from "./pages/AnalyticsManagement";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 import NotFound from "./pages/NotFound";
@@ -199,6 +204,56 @@ const AppContent = () => {
             <ProtectedRoute>
               <PageTransition>
                 <StripeRefresh />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/stripe/manage" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <StripeManagement />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/webhooks/manage" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <WebhookManagement />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/submissions/manage" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <SubmissionManagement />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/pages/manage" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <PageManagement />
+              </PageTransition>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/analytics/manage" 
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <AnalyticsManagement />
               </PageTransition>
             </ProtectedRoute>
           } 

@@ -301,17 +301,28 @@ const Dashboard = () => {
               {isStripeConnected ? (
                 <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
                   <CheckCircle className="w-3 h-3 mr-1" />
-                  Stripe status : ``
+                  Stripe Connected
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-blue-600 text-blue-700 bg-blue-50 font-semibold">
+                <Badge variant="outline" className="border-orange-600 text-orange-700 bg-orange-50 font-semibold">
                   <AlertTriangle className="w-3 h-3 mr-1" />
-                  Preview Mode
+                  Connect Stripe
                 </Badge>
               )}
             </div>
             
             <div className="flex items-center space-x-3">
+              {!isStripeConnected && (
+                <Button 
+                  variant="default"
+                  size="sm"
+                  onClick={() => navigate('/stripe/manage')}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Connect Stripe
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -324,11 +335,38 @@ const Dashboard = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
+                onClick={() => navigate('/analytics/manage')}
+                className="magnetic-button hover:bg-cyan-50 hover:border-cyan-300"
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Advanced Analytics
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
                 onClick={() => navigate('/submissions')}
                 className="magnetic-button hover:bg-purple-50 hover:border-purple-300"
               >
                 <Eye className="w-4 h-4 mr-2" />
                 Submissions
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/submissions/manage')}
+                className="magnetic-button hover:bg-indigo-50 hover:border-indigo-300"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Manage Submissions
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/pages/manage')}
+                className="magnetic-button hover:bg-green-50 hover:border-green-300"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Manage Pages
               </Button>
               <Button 
                 variant="outline" 

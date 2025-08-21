@@ -28,12 +28,49 @@ export const createPage = asyncHandler(async (req, res) => {
     res.status(201).json({ status: 'success', data: { page: newPage } });
 });
 
-// @desc    Get all pages created by the user
+// @desc    Get all pages created by the user with enhanced data
 // @route   GET /api/pages
 // @access  Private
 export const getUserPages = asyncHandler(async (req, res) => {
     const userId = req.user._id || req.user.id;
+    const { includeStats = false } = req.query;
+    
     const pages = await CheckoutPage.find({ userId }).sort({ createdAt: -1 });
+    
+    if (includeStats === 'true') {
+        // Get submission and payment stats for each page
+        const pagesWithStats = await Promise.all(
+            pages.map(async (page) => {
+                const [totalSubmissions, completedSubmissions, pendingSubmissions] = await Promise.all([
+                    Submission.countDocuments({ pageId: page._id }),
+                    Submission.countDocuments({ pageId: page._id, paymentStatus: 'completed' }),
+                    Submission.countDocuments({ pageId: page._id, paymentStatus: 'pending' })
+                ]);
+
+                const conversionRate = totalSubmissions > 0 
+                    ? Math.round((completedSubmissions / totalSubmissions) * 100) 
+                    : 0;
+
+                return {
+                    ...page.toObject(),
+                    stats: {
+                        totalSubmissions,
+                        completedSubmissions,
+                        pendingSubmissions,
+                        freeSubmissions: totalSubmissions - completedSubmissions - pendingSubmissions,
+                        conversionRate
+                    }
+                };
+            })
+        );
+        
+        return res.status(200).json({ 
+            status: 'success', 
+            results: pagesWithStats.length,
+            data: { pages: pagesWithStats } 
+        });
+    }
+    
     res.status(200).json({ status: 'success', results: pages.length, data: { pages } });
 });
 
@@ -112,6 +149,210 @@ export const deletePage = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(userId, { $pull: { createdPages: req.params.id } });
 
     res.status(204).json({ status: 'success', data: null });
+});
+
+// @desc    Get detailed page analytics
+// @route   GET /api/pages/:id/analytics
+// @access  Private
+export const getPageAnalytics = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { days = 30 } = req.query;
+    const userId = req.user._id || req.user.id;
+
+    // Verify page ownership
+    const page = await CheckoutPage.findById(id);
+    if (!page) {
+        res.status(404);
+        throw new Error('Page not found.');
+    }
+
+    if (page.userId.toString() !== userId.toString()) {
+        res.status(403);
+        throw new Error('You are not authorized to view this page analytics.');
+    }
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    // Get detailed analytics
+    const [
+        totalSubmissions,
+        recentSubmissions,
+        submissionsByStatus,
+        submissionsOverTime,
+        topFormFields
+    ] = await Promise.all([
+        // Total submissions
+        Submission.countDocuments({ pageId: id }),
+        
+        // Recent submissions count
+        Submission.countDocuments({ 
+            pageId: id, 
+            createdAt: { $gte: startDate } 
+        }),
+        
+        // Submissions by status
+        Submission.aggregate([
+            { $match: { pageId: page._id } },
+            {
+                $group: {
+                    _id: '$paymentStatus',
+                    count: { $sum: 1 }
+                }
+            }
+        ]),
+        
+        // Submissions over time (daily)
+        Submission.aggregate([
+            {
+                $match: {
+                    pageId: page._id,
+                    createdAt: { $gte: startDate }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$createdAt"
+                        }
+                    },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]),
+        
+        // Most common form field values
+        Submission.aggregate([
+            { $match: { pageId: page._id } },
+            { $limit: 100 }, // Limit for performance
+            {
+                $project: {
+                    formDataKeys: { $objectToArray: "$formData" }
+                }
+            },
+            { $unwind: "$formDataKeys" },
+            {
+                $group: {
+                    _id: "$formDataKeys.k",
+                    count: { $sum: 1 },
+                    sampleValues: { $addToSet: "$formDataKeys.v" }
+                }
+            },
+            { $sort: { count: -1 } },
+            { $limit: 10 }
+        ])
+    ]);
+
+    const statusMap = submissionsByStatus.reduce((acc, item) => {
+        acc[item._id] = item.count;
+        return acc;
+    }, {});
+
+    const analytics = {
+        pageInfo: {
+            id: page._id,
+            title: page.title,
+            slug: page.slug,
+            productName: page.productName,
+            price: page.price,
+            currency: page.currency,
+            createdAt: page.createdAt
+        },
+        summary: {
+            totalSubmissions,
+            recentSubmissions,
+            completedSubmissions: statusMap.completed || 0,
+            pendingSubmissions: statusMap.pending || 0,
+            freeSubmissions: statusMap.none || 0,
+            conversionRate: totalSubmissions > 0 
+                ? Math.round(((statusMap.completed || 0) / totalSubmissions) * 100) 
+                : 0
+        },
+        submissionsOverTime,
+        topFormFields: topFormFields.map(field => ({
+            fieldName: field._id,
+            submissionCount: field.count,
+            sampleValues: field.sampleValues.slice(0, 3) // Show first 3 sample values
+        }))
+    };
+
+    res.status(200).json({
+        status: 'success',
+        data: analytics
+    });
+});
+
+// @desc    Duplicate a page
+// @route   POST /api/pages/:id/duplicate
+// @access  Private
+export const duplicatePage = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    // Get original page
+    const originalPage = await CheckoutPage.findById(id);
+    if (!originalPage) {
+        res.status(404);
+        throw new Error('Page not found.');
+    }
+
+    if (originalPage.userId.toString() !== userId.toString()) {
+        res.status(403);
+        throw new Error('You are not authorized to duplicate this page.');
+    }
+
+    // Create duplicate with unique slug
+    const duplicateData = originalPage.toObject();
+    delete duplicateData._id;
+    delete duplicateData.createdAt;
+    delete duplicateData.updatedAt;
+    
+    duplicateData.title = `${duplicateData.title} (Copy)`;
+    duplicateData.slug = await generateUniqueSlug(duplicateData.title);
+
+    const duplicatedPage = await CheckoutPage.create(duplicateData);
+    await User.findByIdAndUpdate(userId, { $push: { createdPages: duplicatedPage._id } });
+
+    res.status(201).json({
+        status: 'success',
+        message: 'Page duplicated successfully.',
+        data: { page: duplicatedPage }
+    });
+});
+
+// @desc    Toggle page status (active/inactive)
+// @route   PATCH /api/pages/:id/toggle-status
+// @access  Private
+export const togglePageStatus = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const page = await CheckoutPage.findById(id);
+    if (!page) {
+        res.status(404);
+        throw new Error('Page not found.');
+    }
+
+    if (page.userId.toString() !== userId.toString()) {
+        res.status(403);
+        throw new Error('You are not authorized to modify this page.');
+    }
+
+    // Toggle active status (assuming we add an 'active' field to the schema)
+    const updatedPage = await CheckoutPage.findByIdAndUpdate(
+        id, 
+        { active: !page.active },
+        { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+        status: 'success',
+        message: `Page ${updatedPage.active ? 'activated' : 'deactivated'} successfully.`,
+        data: { page: updatedPage }
+    });
 });
 
 

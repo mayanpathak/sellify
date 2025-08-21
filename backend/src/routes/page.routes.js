@@ -29,6 +29,11 @@ router
   .patch(protect, validateUpdatePage, pageController.updatePage)
   .delete(protect, validatePageId, pageController.deletePage);
 
+// --- Advanced page management routes ---
+router.get('/:id/analytics', protect, validatePageId, pageController.getPageAnalytics);
+router.post('/:id/duplicate', protect, validatePageId, pageController.duplicatePage);
+router.patch('/:id/toggle-status', protect, validatePageId, pageController.togglePageStatus);
+
 // --- Get submissions for a specific page ---
 router.get('/:id/submissions', protect, validatePageId, getPageSubmissions);
 
