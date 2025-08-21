@@ -111,6 +111,28 @@ export const connectStripeAccount = async (userId, accountType = 'real') => {
         };
     } catch (error) {
         console.error('Stripe account creation failed:', error);
+        
+        // If Stripe Connect is not enabled, automatically create mock account as fallback
+        if (error.message.includes('signed up for Connect')) {
+            console.log('Stripe Connect not available, creating mock account as fallback...');
+            
+            // Create a mock Stripe account as fallback
+            const mockStripeAccountId = `acct_mock_${Date.now()}`;
+            
+            await User.findByIdAndUpdate(userId, {
+                stripeAccountId: mockStripeAccountId,
+                stripeAccountType: 'mock', // Track account type
+            });
+
+            return {
+                message: 'Stripe Connect is not available. Created mock account for testing instead.',
+                stripeAccountId: mockStripeAccountId,
+                onboardingUrl: null,
+                isMock: true,
+                fallbackToMock: true,
+            };
+        }
+        
         throw new Error(`Failed to create Stripe account: ${error.message}`);
     }
 };

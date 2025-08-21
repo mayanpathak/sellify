@@ -34,7 +34,6 @@ import { CheckoutPage, pagesApi, stripeApi } from '@/lib/api';
 const Dashboard = () => {
   const [pages, setPages] = useState<CheckoutPage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stripeConnecting, setStripeConnecting] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -47,6 +46,7 @@ const Dashboard = () => {
   const pagesGridRef = useRef<HTMLDivElement>(null);
 
   const isStripeConnected = !!user?.stripeAccountId;
+  const isMockAccount = user?.stripeAccountId?.startsWith('acct_mock_');
 
   useEffect(() => {
     fetchPages();
@@ -139,23 +139,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleStripeConnect = async () => {
-    setStripeConnecting(true);
-    try {
-      const response = await stripeApi.connectAccount();
-      if (response.data?.onboardingUrl) {
-        window.location.href = response.data.onboardingUrl;
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to connect Stripe account. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setStripeConnecting(false);
-    }
-  };
+
 
   const handleDeletePage = async (pageId: string) => {
     const pageCard = document.querySelector(`[data-page-id="${pageId}"]`);
@@ -320,10 +304,17 @@ const Dashboard = () => {
                 {user?.plan?.toUpperCase() || 'FREE'}
               </Badge>
               {isStripeConnected ? (
-                <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Stripe Connected
-                </Badge>
+                isMockAccount ? (
+                  <Badge variant="outline" className="border-purple-600 text-purple-700 bg-purple-50 font-semibold">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Mock Account (Testing)
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-green-600 text-green-700 bg-green-50 font-semibold">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Stripe Connected
+                  </Badge>
+                )
               ) : (
                 <Badge variant="outline" className="border-orange-600 text-orange-700 bg-orange-50 font-semibold">
                   <AlertTriangle className="w-3 h-3 mr-1" />
@@ -476,7 +467,7 @@ const Dashboard = () => {
         )}
 
         {/* Stripe Connection Alert */}
-        {!isStripeConnected && (
+        {!isStripeConnected ? (
           <Alert className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
             <CreditCard className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -484,21 +475,42 @@ const Dashboard = () => {
                 <div>
                   <strong>Connect your Stripe account</strong>
                   <p className="text-sm mt-1">
-                    Connect Stripe to start accepting real payments on your checkout pages.
+                    Connect Stripe to start accepting payments on your checkout pages. Choose between real payments or mock testing.
                   </p>
                 </div>
                 <Button 
-                  onClick={handleStripeConnect} 
-                  disabled={stripeConnecting}
+                  onClick={() => navigate('/stripe/manage')}
                   size="sm"
                   className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
                 >
-                  {stripeConnecting ? 'Connecting...' : 'Connect Stripe'}
+                  Choose Account Type
                 </Button>
               </div>
             </AlertDescription>
           </Alert>
-        )}
+        ) : isMockAccount ? (
+          <Alert className="mb-6 border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50 shadow-lg">
+            <CreditCard className="h-4 w-4 text-purple-600" />
+            <AlertDescription className="text-purple-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <strong>Mock Account Active</strong>
+                  <p className="text-sm mt-1">
+                    You're using a test account. All payments are simulated and no real money is processed. Perfect for testing!
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => navigate('/stripe/manage')}
+                  size="sm"
+                  variant="outline"
+                  className="border-purple-300 text-purple-700 hover:bg-purple-100"
+                >
+                  Manage Account
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {/* Pages Section */}
         <div className="flex items-center justify-between mb-6">

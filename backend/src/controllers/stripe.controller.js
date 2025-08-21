@@ -49,11 +49,32 @@ export const connectAccount = asyncHandler(async (req, res) => {
     }
     
     const { accountType = 'real' } = req.body; // Get account type from request body
-    const result = await stripeService.connectStripeAccount(userId, accountType);
-    res.status(200).json({
-        status: 'success',
-        data: result,
-    });
+    
+    try {
+        const result = await stripeService.connectStripeAccount(userId, accountType);
+        
+        // Handle fallback to mock account
+        if (result.fallbackToMock) {
+            return res.status(200).json({
+                status: 'success',
+                data: result,
+                warning: 'Stripe Connect not available, created mock account instead'
+            });
+        }
+        
+        res.status(200).json({
+            status: 'success',
+            data: result,
+        });
+    } catch (error) {
+        console.error('Stripe connection error:', error);
+        
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+            hint: accountType === 'real' ? 'Try using mock mode for testing.' : 'Mock account creation failed.'
+        });
+    }
 });
 
 /**

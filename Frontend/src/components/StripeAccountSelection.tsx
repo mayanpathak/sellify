@@ -48,11 +48,20 @@ const StripeAccountSelection: React.FC<StripeAccountSelectionProps> = ({
           // Redirect to Stripe onboarding
           window.location.href = data.data.onboardingUrl;
         } else {
-          // Mock account created successfully
-          toast({
-            title: "Success",
-            description: data.message,
-          });
+          // Account created successfully (mock or fallback)
+          if (data.warning) {
+            // This was a fallback to mock account
+            toast({
+              title: "Mock Account Created",
+              description: data.warning + ". You can still test all features!",
+              variant: "default"
+            });
+          } else {
+            toast({
+              title: "Success",
+              description: data.data.message,
+            });
+          }
           onAccountConnected(data.data);
         }
       } else {
@@ -160,7 +169,8 @@ const StripeAccountSelection: React.FC<StripeAccountSelectionProps> = ({
                 <Alert className="mt-4 border-amber-200 bg-amber-50">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-800 text-sm">
-                    Requires Stripe account verification and may take 1-2 business days to activate.
+                    <strong>Note:</strong> Requires Stripe Connect to be enabled by the application administrator. 
+                    If not available, a mock account will be created automatically for testing.
                   </AlertDescription>
                 </Alert>
 
