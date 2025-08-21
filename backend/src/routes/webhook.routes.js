@@ -25,7 +25,7 @@ router.get('/events', protect, getWebhookEvents);
 router.get('/events/:eventId', protect, getWebhookEventDetails);
 router.get('/stats', protect, getWebhookStats);
 
-// Mock payment completion route
-router.post('/mock-payment-complete', completeMockPayment);
+// Mock payment completion route (needs JSON parsing)
+router.post('/mock-payment-complete', express.json(), completeMockPayment);
 
 export default router; 

@@ -468,8 +468,9 @@ export const completeMockPayment = asyncHandler(async (req, res) => {
         }
 
         // Update payment status to completed
-        payment.status = 'succeeded';
+        payment.status = 'completed';
         payment.stripePaymentIntentId = `pi_mock_${Date.now()}`;
+        payment.paymentCompletedAt = new Date();
         await payment.save();
 
         // Create a submission record if this is from a checkout page

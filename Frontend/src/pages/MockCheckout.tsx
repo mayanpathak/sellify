@@ -22,7 +22,7 @@ interface CheckoutPage {
   _id: string;
   title: string;
   productName: string;
-  description: string;
+  description?: string;
   price: number;
   currency: string;
   fields: Array<{
@@ -119,7 +119,23 @@ const MockCheckout: React.FC = () => {
         }),
       });
 
-      const data = await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Error response body:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText || 'Payment failed'}`);
+      }
+
+      const responseText = await response.text();
+      console.log('Response body:', responseText);
+      
+      if (!responseText.trim()) {
+        throw new Error('Empty response from server');
+      }
+      
+      const data = JSON.parse(responseText);
 
       if (data.status === 'success') {
         // Simulate processing delay for realism
