@@ -97,9 +97,8 @@ export const getConnectionStatus = asyncHandler(async (req, res) => {
         });
     }
 
-    // In development mode, return mock data
-    if ((process.env.NODE_ENV === 'development' && (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')) || 
-        (user.stripeAccountId.startsWith('acct_mock_') && (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here'))) {
+    // If it's a mock account, always return mock data regardless of Stripe configuration
+    if (user.stripeAccountId.startsWith('acct_mock_')) {
         return res.status(200).json({
             status: 'success',
             data: {
@@ -112,6 +111,14 @@ export const getConnectionStatus = asyncHandler(async (req, res) => {
                     mock: true
                 }
             }
+        });
+    }
+
+    // For real accounts, check if Stripe is configured
+    if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here') {
+        return res.status(500).json({
+            status: 'error',
+            message: 'Stripe is not configured properly'
         });
     }
 

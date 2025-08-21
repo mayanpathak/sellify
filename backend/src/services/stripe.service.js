@@ -190,32 +190,8 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
         };
     }
 
-    // If user has a mock account but Stripe is configured, create a real account
-    if (user.stripeAccountId.startsWith('acct_mock_') && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_your_stripe_secret_key_here') {
-        console.log('User has mock account but Stripe is configured - creating real Stripe account');
-        
-        try {
-            // Create real Stripe Express account
-            const account = await stripe.accounts.create({
-                type: 'express',
-                country: 'US',
-                email: (await User.findById(userId)).email,
-            });
-
-            // Update user with real account ID
-            await User.findByIdAndUpdate(userId, {
-                stripeAccountId: account.id,
-            });
-
-            // Update user object for this request
-            user.stripeAccountId = account.id;
-            
-            console.log(`Created real Stripe account ${account.id} to replace mock account`);
-        } catch (error) {
-            console.error('Failed to create real Stripe account:', error);
-            throw new Error('Unable to create Stripe account. Please try connecting your Stripe account again.');
-        }
-    }
+    // Don't try to upgrade mock accounts automatically
+    // Mock accounts should stay mock until user explicitly chooses to upgrade
 
     try {
         // Calculate total amount including order bumps
@@ -252,6 +228,14 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
             }))),
         ];
 
+        // Prepare Stripe session options
+        const sessionOptions = {};
+        
+        // Only pass stripeAccount if it's a real account (not mock)
+        if (!user.stripeAccountId.startsWith('acct_mock_')) {
+            sessionOptions.stripeAccount = user.stripeAccountId;
+        }
+
         // Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -271,9 +255,7 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
                 userId: userId,
                 totalAmount: totalAmount.toString(),
             },
-        }, {
-            stripeAccount: user.stripeAccountId, // Stripe Connect - pass as option
-        });
+        }, sessionOptions);
 
         // Create pending payment record
         const payment = new Payment({

@@ -440,11 +440,26 @@ export const getWebhookStats = asyncHandler(async (req, res) => {
 
 // Mock payment completion handler
 export const completeMockPayment = asyncHandler(async (req, res) => {
+    console.log('Mock payment completion request received:', {
+        body: req.body,
+        sessionId: req.body?.sessionId
+    });
+    
     const { sessionId } = req.body;
+    
+    if (!sessionId) {
+        console.log('No session ID provided');
+        return res.status(400).json({
+            status: 'error',
+            message: 'Session ID is required'
+        });
+    }
     
     try {
         // Find the payment by session ID
         const payment = await Payment.findOne({ stripeSessionId: sessionId });
+        console.log('Found payment:', payment ? 'Yes' : 'No');
+        
         if (!payment) {
             return res.status(404).json({
                 status: 'error',
