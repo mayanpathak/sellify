@@ -82,7 +82,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
 // --- Mock payment completion route (after JSON parser) ---
-app.post('/api/webhooks/mock-payment-complete', completeMockPayment);
+app.post('/api/mock-payment-complete', completeMockPayment);
 
 // --- Health Check Route ---
 app.get('/', (req, res) => {

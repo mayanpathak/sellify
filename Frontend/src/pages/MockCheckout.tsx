@@ -107,7 +107,7 @@ const MockCheckout: React.FC = () => {
 
     try {
       // Complete the mock payment
-      const response = await fetch('/api/webhooks/mock-payment-complete', {
+      const response = await fetch('/api/mock-payment-complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
