@@ -20,7 +20,8 @@ import {
   TrendingUp,
   DollarSign,
   Users,
-  Activity
+  Activity,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,56 +53,69 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Dashboard entrance animations
+    // Dashboard entrance animations with error handling
     const ctx = gsap.context(() => {
-      // Header slide down
-      gsap.fromTo(headerRef.current,
-        { y: -100, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.8, ease: "power2.out" }
-      );
+      // Header slide down - only if element exists
+      if (headerRef.current) {
+        gsap.fromTo(headerRef.current,
+          { y: -100, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.8, ease: "power2.out" }
+        );
+      }
 
-      // Welcome section fade in
-      gsap.fromTo(welcomeRef.current,
-        { y: 50, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, delay: 0.2, ease: "power2.out" }
-      );
+      // Welcome section fade in - only if element exists
+      if (welcomeRef.current) {
+        gsap.fromTo(welcomeRef.current,
+          { y: 50, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.6, delay: 0.2, ease: "power2.out" }
+        );
+      }
 
-      // Stats cards stagger animation
-      gsap.fromTo('.stat-card',
-        { y: 30, opacity: 0, scale: 0.9 },
-        { 
-          y: 0, 
-          opacity: 1, 
-          scale: 1, 
-          duration: 0.5, 
-          stagger: 0.1, 
-          delay: 0.4,
-          ease: "back.out(1.7)" 
-        }
-      );
+      // Stats cards stagger animation - check if elements exist
+      const statCards = document.querySelectorAll('.stat-card');
+      if (statCards.length > 0) {
+        gsap.fromTo('.stat-card',
+          { y: 30, opacity: 0, scale: 0.9 },
+          { 
+            y: 0, 
+            opacity: 1, 
+            scale: 1, 
+            duration: 0.5, 
+            stagger: 0.1, 
+            delay: 0.4,
+            ease: "back.out(1.7)" 
+          }
+        );
+      }
 
-      // Page cards stagger animation
-      gsap.fromTo('.page-card',
-        { y: 40, opacity: 0, rotationX: 15 },
-        { 
-          y: 0, 
-          opacity: 1, 
-          rotationX: 0,
-          duration: 0.6, 
-          stagger: 0.08, 
-          delay: 0.6,
-          ease: "power2.out" 
-        }
-      );
+      // Page cards stagger animation - check if elements exist
+      const pageCards = document.querySelectorAll('.page-card');
+      if (pageCards.length > 0) {
+        gsap.fromTo('.page-card',
+          { y: 40, opacity: 0, rotationX: 15 },
+          { 
+            y: 0, 
+            opacity: 1, 
+            rotationX: 0,
+            duration: 0.6, 
+            stagger: 0.08, 
+            delay: 0.6,
+            ease: "power2.out" 
+          }
+        );
+      }
 
-      // Add floating animation to create button
-      gsap.to('.create-button', {
-        y: -5,
-        duration: 2,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut"
-      });
+      // Add floating animation to create button - check if element exists
+      const createButton = document.querySelector('.create-button');
+      if (createButton) {
+        gsap.to('.create-button', {
+          y: -5,
+          duration: 2,
+          repeat: -1,
+          yoyo: true,
+          ease: "sine.inOut"
+        });
+      }
 
     }, dashboardRef);
 
@@ -188,15 +202,18 @@ const Dashboard = () => {
     const url = `${window.location.origin}/page/${slug}`;
     navigator.clipboard.writeText(url);
     
-    // Success animation
-    gsap.to('.copy-success', {
-      scale: 1.2,
-      opacity: 1,
-      duration: 0.2,
-      yoyo: true,
-      repeat: 1,
-      ease: "power2.out"
-    });
+    // Success animation - check if element exists
+    const copySuccessElement = document.querySelector('.copy-success');
+    if (copySuccessElement) {
+      gsap.to('.copy-success', {
+        scale: 1.2,
+        opacity: 1,
+        duration: 0.2,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.out"
+      });
+    }
 
     toast({
       title: "Copied!",
@@ -206,24 +223,28 @@ const Dashboard = () => {
 
   const handleCardHover = (e: React.MouseEvent) => {
     const card = e.currentTarget;
-    gsap.to(card, {
-      y: -10,
-      scale: 1.02,
-      boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
-      duration: 0.3,
-      ease: "power2.out"
-    });
+    if (card) {
+      gsap.to(card, {
+        y: -10,
+        scale: 1.02,
+        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)",
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
   };
 
   const handleCardLeave = (e: React.MouseEvent) => {
     const card = e.currentTarget;
-    gsap.to(card, {
-      y: 0,
-      scale: 1,
-      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-      duration: 0.3,
-      ease: "power2.out"
-    });
+    if (card) {
+      gsap.to(card, {
+        y: 0,
+        scale: 1,
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
   };
 
   const getPlanBadgeColor = (plan: string) => {
