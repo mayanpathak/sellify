@@ -42,14 +42,27 @@ const PaymentSuccess: React.FC = () => {
 
   const fetchPaymentDetails = async () => {
     try {
-      // Use the new public verification endpoint
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stripe/verify/${sessionId}`);
+      // Use the correct API base URL (same as the API client)
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://sellify-o36c.onrender.com';
+      const verificationUrl = `${API_BASE_URL}/api/stripe/verify/${sessionId}`;
+      
+      console.log('Attempting to verify payment with URL:', verificationUrl);
+      console.log('Session ID:', sessionId);
+      console.log('API_BASE_URL:', API_BASE_URL);
+      
+      const response = await fetch(verificationUrl);
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Error response body:', errorText);
+        
         if (response.status === 404) {
           throw new Error('Payment not found');
         }
-        throw new Error('Failed to verify payment');
+        throw new Error(`Failed to verify payment: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
