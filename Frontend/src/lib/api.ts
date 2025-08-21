@@ -193,6 +193,10 @@ class ApiClient {
     return this.request<{ page: CheckoutPage; isStripeConnected: boolean }>(`/api/pages/${slug}`);
   }
 
+  async getPageById(id: string) {
+    return this.request<{ page: CheckoutPage; isStripeConnected: boolean }>(`/api/pages/id/${id}`);
+  }
+
   async updatePage(id: string, pageData: Partial<CheckoutPage>) {
     return this.request<{ page: CheckoutPage }>(`/api/pages/${id}`, {
       method: 'PUT',
@@ -497,6 +501,7 @@ export const pagesApi = {
   create: (pageData: Partial<CheckoutPage>) => apiClient.createPage(pageData),
   getUserPages: (includeStats?: boolean) => apiClient.getUserPages(includeStats),
   getBySlug: (slug: string) => apiClient.getPageBySlug(slug),
+  getById: (id: string) => apiClient.getPageById(id),
   update: (id: string, pageData: Partial<CheckoutPage>) =>
     apiClient.updatePage(id, pageData),
   delete: (id: string) => apiClient.deletePage(id),

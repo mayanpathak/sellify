@@ -37,7 +37,8 @@ router.patch('/:id/toggle-status', protect, validatePageId, pageController.toggl
 // --- Get submissions for a specific page ---
 router.get('/:id/submissions', protect, validatePageId, getPageSubmissions);
 
-// --- Public page access route ---
-router.get('/:slug', validateSlug, pageController.getPageBySlug);
+// --- Public page access routes ---
+router.get('/id/:id', pageController.getPageById); // Get page by ID (for mock checkout)
+router.get('/:slug', validateSlug, pageController.getPageBySlug); // Get page by slug
 
 export default router;

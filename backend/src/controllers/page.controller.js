@@ -97,6 +97,29 @@ export const getPageBySlug = asyncHandler(async (req, res) => {
     });
 });
 
+// @desc    Get a checkout page by ID (for internal use like mock checkout)
+// @route   GET /api/pages/id/:id
+// @access  Public
+export const getPageById = asyncHandler(async (req, res) => {
+    const page = await CheckoutPage.findById(req.params.id);
+    if (!page) {
+        res.status(404);
+        throw new Error('Checkout page not found.');
+    }
+
+    // Get page owner's Stripe connection status
+    const pageOwner = await User.findById(page.userId).select('stripeAccountId');
+    const isStripeConnected = !!pageOwner?.stripeAccountId;
+
+    res.status(200).json({ 
+        status: 'success', 
+        data: { 
+            page,
+            isStripeConnected 
+        } 
+    });
+});
+
 // @desc    Update a checkout page
 // @route   PATCH /api/pages/:id
 // @access  Private

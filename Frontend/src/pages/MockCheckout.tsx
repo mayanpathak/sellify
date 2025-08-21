@@ -59,7 +59,7 @@ const MockCheckout: React.FC = () => {
   const fetchPageData = async () => {
     try {
       setLoading(true);
-      const response = await pagesApi.getBySlug(pageId!);
+      const response = await pagesApi.getById(pageId!);
       setPage(response.data.page);
       
       // Initialize form data with empty values
@@ -163,7 +163,7 @@ const MockCheckout: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="page-loader animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
