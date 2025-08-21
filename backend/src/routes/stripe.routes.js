@@ -12,4 +12,7 @@ router.delete('/disconnect', protect, stripeController.disconnectAccount);
 // Stripe session routes (public - anyone can pay)
 router.post('/session/:pageId', stripeController.createSession);
 
+// Public payment verification route
+router.get('/verify/:sessionId', stripeController.verifyPaymentStatus);
+
 export default router;

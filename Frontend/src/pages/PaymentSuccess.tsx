@@ -42,41 +42,14 @@ const PaymentSuccess: React.FC = () => {
 
   const fetchPaymentDetails = async () => {
     try {
-      const authToken = localStorage.getItem('authToken');
-      
-      if (!authToken) {
-        // For public users, show a generic success message
-        setPaymentDetails({
-          sessionId: sessionId!,
-          amount: 0, // We don't know the amount without auth
-          currency: 'usd',
-          status: 'completed',
-          customerEmail: null,
-          customerName: null,
-          createdAt: new Date().toISOString(),
-          pageId: {
-            title: 'Purchase',
-            productName: 'Product'
-          }
-        });
-        
-        toast({
-          title: "Payment Successful! 🎉",
-          description: "Your payment has been processed successfully. You should receive a confirmation email shortly.",
-        });
-        
-        setLoading(false);
-        return;
-      }
-      
-      const response = await fetch(`/api/analytics/payments/status?sessionId=${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
+      // Use the new public verification endpoint
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/stripe/verify/${sessionId}`);
 
       if (!response.ok) {
-        throw new Error('Payment not found');
+        if (response.status === 404) {
+          throw new Error('Payment not found');
+        }
+        throw new Error('Failed to verify payment');
       }
 
       const data = await response.json();
@@ -167,13 +140,19 @@ ${paymentDetails.customerEmail ? `Email: ${paymentDetails.customerEmail}` : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full"
-              variant="outline"
-            >
-              Go to Dashboard
-            </Button>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 text-center">
+                If you made a payment, please check your email for the receipt. 
+                If you need assistance, please contact the seller directly.
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/'}
+                className="w-full"
+                variant="outline"
+              >
+                Return to Homepage
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -278,10 +257,10 @@ ${paymentDetails.customerEmail ? `Email: ${paymentDetails.customerEmail}` : ''}
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Button 
-              onClick={() => navigate('/dashboard')}
+              onClick={() => window.location.href = '/'}
               className="flex-1 bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-700 hover:to-sky-600"
             >
-              Go to Dashboard
+              Return to Homepage
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
             

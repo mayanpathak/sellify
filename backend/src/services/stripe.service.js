@@ -156,7 +156,6 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
             cancel_url:
                 page.cancelRedirectUrl ||
                 `${process.env.CLIENT_URL}/page/${page.slug}`,
-            stripe_account: user.stripeAccountId, // Stripe Connect
             payment_intent_data: {
                 application_fee_amount: Math.round(totalAmount * 0.05), // 5% platform fee
             },
@@ -165,6 +164,8 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
                 userId: userId,
                 totalAmount: totalAmount.toString(),
             },
+        }, {
+            stripeAccount: user.stripeAccountId, // Stripe Connect - pass as option
         });
 
         // Create pending payment record

@@ -20,11 +20,16 @@ export const handleSubmission = asyncHandler(async (req, res) => {
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.get('User-Agent');
 
+    // For pages with payment enabled, create a pending submission
+    // It will only be counted after successful payment via webhook
+    const paymentStatus = page.price > 0 ? 'pending' : 'none';
+
     const submission = await Submission.create({
         pageId: page._id,
         formData: req.body,
         ipAddress,
         userAgent,
+        paymentStatus,
     });
 
     res.status(201).json({
@@ -32,6 +37,7 @@ export const handleSubmission = asyncHandler(async (req, res) => {
         message: 'Form submitted successfully.',
         data: {
             submissionId: submission._id,
+            requiresPayment: page.price > 0,
         },
     });
 });
@@ -57,9 +63,12 @@ export const getPageSubmissions = asyncHandler(async (req, res) => {
         throw new Error('You are not authorized to view these submissions.');
     }
 
-    const submissions = await Submission.find({ pageId: id })
+    const submissions = await Submission.find({ 
+        pageId: id,
+        paymentStatus: { $in: ['completed', 'none'] }
+    })
         .sort({ createdAt: -1 })
-        .select('formData createdAt');
+        .select('formData createdAt paymentStatus');
 
     res.status(200).json({
         status: 'success',
@@ -80,11 +89,14 @@ export const getUserSubmissions = asyncHandler(async (req, res) => {
     const userPages = await CheckoutPage.find({ userId }).select('_id title slug');
     const pageIds = userPages.map(page => page._id);
 
-    // Get submissions for all user's pages
-    const submissions = await Submission.find({ pageId: { $in: pageIds } })
+    // Get submissions for all user's pages (only completed or no payment required)
+    const submissions = await Submission.find({ 
+        pageId: { $in: pageIds },
+        paymentStatus: { $in: ['completed', 'none'] }
+    })
         .populate('pageId', 'title slug')
         .sort({ createdAt: -1 })
-        .select('formData createdAt pageId');
+        .select('formData createdAt pageId paymentStatus');
 
     res.status(200).json({
         status: 'success',

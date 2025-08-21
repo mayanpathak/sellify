@@ -164,3 +164,44 @@ export const createSession = asyncHandler(async (req, res) => {
         data: result,
     });
 });
+
+/**
+ * @desc    Verify payment status (public endpoint for payment success page)
+ * @route   GET /api/stripe/verify/:sessionId
+ * @access  Public
+ */
+export const verifyPaymentStatus = asyncHandler(async (req, res) => {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+        res.status(400);
+        throw new Error('Session ID is required');
+    }
+
+    const Payment = (await import('../models/Payment.js')).default;
+    const payment = await Payment.findOne({ stripeSessionId: sessionId })
+        .populate('pageId', 'title productName slug')
+        .lean();
+
+    if (!payment) {
+        res.status(404);
+        throw new Error('Payment not found');
+    }
+
+    // Return limited payment details for public verification
+    res.status(200).json({
+        status: 'success',
+        data: {
+            payment: {
+                _id: payment._id,
+                amount: payment.amount,
+                currency: payment.currency,
+                status: payment.status,
+                customerEmail: payment.customerEmail,
+                customerName: payment.customerName,
+                paymentCompletedAt: payment.paymentCompletedAt || payment.createdAt,
+                pageId: payment.pageId
+            }
+        }
+    });
+});
