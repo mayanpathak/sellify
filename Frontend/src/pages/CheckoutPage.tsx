@@ -262,8 +262,8 @@ const CheckoutPage = () => {
                     <AlertDescription className="text-orange-800">
                       <strong>Preview Mode</strong>
                       <p className="text-sm mt-1">
-                        This is a preview of the checkout page. The page owner needs to connect their Stripe account to accept payments.
-                        You can still submit the form to test the functionality.
+                        This is a preview of the checkout page. The page owner needs to connect their Stripe account to accept real payments.
+                        You can still submit the form to test the functionality, but no actual payment will be processed.
                       </p>
                     </AlertDescription>
                   </Alert>

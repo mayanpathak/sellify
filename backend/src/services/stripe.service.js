@@ -76,8 +76,10 @@ export const connectStripeAccount = async (userId) => {
             onboardingUrl: accountLink.url,
         };
     } catch (error) {
-        // Fallback to mock for development
-        if (process.env.NODE_ENV === 'development') {
+        // Only fallback to mock if Stripe credentials are missing or invalid
+        if (process.env.NODE_ENV === 'development' && 
+            (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')) {
+            
             const mockStripeAccountId = `acct_mock_${Date.now()}`;
             
             await User.findByIdAndUpdate(userId, {
@@ -85,12 +87,14 @@ export const connectStripeAccount = async (userId) => {
             });
 
             return {
-                message: 'Stripe account connected successfully (mocked for development).',
+                message: 'Stripe account connected successfully (mocked - Stripe not configured).',
                 stripeAccountId: mockStripeAccountId,
                 onboardingUrl: `https://connect.stripe.com/mock/onboarding/${mockStripeAccountId}`,
             };
         }
-        throw error;
+        
+        console.error('Stripe account creation failed:', error);
+        throw new Error(`Failed to create Stripe account: ${error.message}`);
     }
 };
 
@@ -110,9 +114,15 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
         throw new Error('The page owner has not connected a Stripe account.');
     }
 
-    // Check if we're in development mode with a mock account
-    if (process.env.NODE_ENV === 'development' && user.stripeAccountId.startsWith('acct_mock_')) {
-        // Handle mock development mode
+    // Only use mock mode if Stripe credentials are missing or explicitly disabled
+    const shouldUseMock = (
+        process.env.NODE_ENV === 'development' && 
+        user.stripeAccountId.startsWith('acct_mock_') &&
+        (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')
+    );
+
+    if (shouldUseMock) {
+        // Handle mock development mode ONLY when Stripe is not properly configured
         const mockSessionId = `cs_test_mock_${Date.now()}`;
         
         // Create mock payment record
@@ -137,11 +147,38 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
 
         return {
             success: true,
-            message: 'Stripe checkout session created (mocked for development).',
+            message: 'Stripe checkout session created (mocked - Stripe not configured).',
             url: `${process.env.CLIENT_URL}/payment/success?session_id=${mockSessionId}`,
             sessionId: mockSessionId,
             paymentId: payment._id,
         };
+    }
+
+    // If user has a mock account but Stripe is configured, create a real account
+    if (user.stripeAccountId.startsWith('acct_mock_') && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_your_stripe_secret_key_here') {
+        console.log('User has mock account but Stripe is configured - creating real Stripe account');
+        
+        try {
+            // Create real Stripe Express account
+            const account = await stripe.accounts.create({
+                type: 'express',
+                country: 'US',
+                email: (await User.findById(userId)).email,
+            });
+
+            // Update user with real account ID
+            await User.findByIdAndUpdate(userId, {
+                stripeAccountId: account.id,
+            });
+
+            // Update user object for this request
+            user.stripeAccountId = account.id;
+            
+            console.log(`Created real Stripe account ${account.id} to replace mock account`);
+        } catch (error) {
+            console.error('Failed to create real Stripe account:', error);
+            throw new Error('Unable to create Stripe account. Please try connecting your Stripe account again.');
+        }
     }
 
     try {

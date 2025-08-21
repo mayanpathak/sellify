@@ -29,16 +29,19 @@ export const connectAccount = asyncHandler(async (req, res) => {
                         }
                     });
                 }
-            } else {
-                // Development mode - mock account
+            } else if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here') {
+                // Development mode with mock account - only when Stripe not configured
                 return res.status(200).json({
                     status: 'success',
-                    message: 'Stripe account already connected (development mode)',
+                    message: 'Stripe account already connected (mocked - Stripe not configured)',
                     data: {
                         stripeAccountId: user.stripeAccountId,
                         alreadyConnected: true
                     }
                 });
+            } else {
+                // Development mode but Stripe is configured - need real account
+                console.log('User has mock account but Stripe is configured - will create real account');
             }
         } catch (error) {
             console.log('Existing Stripe account invalid, creating new one');
@@ -73,7 +76,8 @@ export const getConnectionStatus = asyncHandler(async (req, res) => {
     }
 
     // In development mode, return mock data
-    if (process.env.NODE_ENV === 'development' || user.stripeAccountId.startsWith('acct_mock_')) {
+    if ((process.env.NODE_ENV === 'development' && (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')) || 
+        (user.stripeAccountId.startsWith('acct_mock_') && (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here'))) {
         return res.status(200).json({
             status: 'success',
             data: {
@@ -191,7 +195,8 @@ export const verifyPaymentStatus = asyncHandler(async (req, res) => {
     }
 
     // For development mock payments, simulate completion
-    if (process.env.NODE_ENV === 'development' && sessionId.startsWith('cs_test_mock_')) {
+    if (process.env.NODE_ENV === 'development' && sessionId.startsWith('cs_test_mock_') && 
+        (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')) {
         if (payment.status === 'pending') {
             // Update payment status to completed
             await Payment.findOneAndUpdate(
