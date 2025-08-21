@@ -48,7 +48,8 @@ export const connectAccount = asyncHandler(async (req, res) => {
         }
     }
     
-    const result = await stripeService.connectStripeAccount(userId);
+    const { accountType = 'real' } = req.body; // Get account type from request body
+    const result = await stripeService.connectStripeAccount(userId, accountType);
     res.status(200).json({
         status: 'success',
         data: result,

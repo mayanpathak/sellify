@@ -24,6 +24,7 @@ import WebhookManagement from "./pages/WebhookManagement";
 import SubmissionManagement from "./pages/SubmissionManagement";
 import PageManagement from "./pages/PageManagement";
 import AnalyticsManagement from "./pages/AnalyticsManagement";
+import MockCheckout from "./pages/MockCheckout";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentFailed from "./pages/PaymentFailed";
 import NotFound from "./pages/NotFound";
@@ -126,6 +127,11 @@ const AppContent = () => {
         <Route path="/page/:slug" element={
           <PageTransition>
             <CheckoutPage />
+          </PageTransition>
+        } />
+        <Route path="/mock-checkout" element={
+          <PageTransition>
+            <MockCheckout />
           </PageTransition>
         } />
         <Route 

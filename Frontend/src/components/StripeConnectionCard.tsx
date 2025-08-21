@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { stripeApi } from '../lib/api';
 import { toast } from '../hooks/use-toast';
+import StripeAccountSelection from './StripeAccountSelection';
 
 interface StripeStatus {
   connected: boolean;
@@ -40,6 +41,7 @@ const StripeConnectionCard: React.FC<StripeConnectionCardProps> = ({
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [showAccountSelection, setShowAccountSelection] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
@@ -64,34 +66,23 @@ const StripeConnectionCard: React.FC<StripeConnectionCardProps> = ({
     }
   };
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const response = await stripeApi.connectAccount();
-      
-      if (response.data.alreadyConnected) {
-        toast({
-          title: "Already Connected",
-          description: response.data.message,
-        });
-        await fetchStripeStatus(); // Refresh status
-      } else if (response.data.onboardingUrl) {
-        toast({
-          title: "Redirecting to Stripe",
-          description: "Complete your Stripe onboarding to start accepting payments",
-        });
-        window.location.href = response.data.onboardingUrl;
-      }
-    } catch (error: any) {
-      console.error('Failed to connect Stripe:', error);
-      toast({
-        title: "Connection Failed",
-        description: error.response?.data?.message || "Failed to connect Stripe account. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    setShowAccountSelection(true);
+  };
+
+  const handleAccountConnected = async (accountData: any) => {
+    setShowAccountSelection(false);
+    
+    toast({
+      title: "Success",
+      description: accountData.isMock ? 
+        "Mock Stripe account created for testing!" : 
+        "Stripe account connected successfully!",
+    });
+    
+    // Refresh status
+    await fetchStripeStatus();
+    onConnectionChange?.(true);
   };
 
   const handleDisconnect = async () => {
@@ -158,6 +149,7 @@ const StripeConnectionCard: React.FC<StripeConnectionCardProps> = ({
   }
 
   return (
+    <>
     <Card className={className}>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -323,6 +315,14 @@ const StripeConnectionCard: React.FC<StripeConnectionCardProps> = ({
         )}
       </CardContent>
     </Card>
+    
+    {showAccountSelection && (
+      <StripeAccountSelection
+        onAccountConnected={handleAccountConnected}
+        onClose={() => setShowAccountSelection(false)}
+      />
+    )}
+  </>
   );
 };
 

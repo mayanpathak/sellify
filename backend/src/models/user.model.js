@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema({
   // Stripe Fields
   stripeCustomerId: { type: String }, // For billing the user
   stripeAccountId: { type: String },  // For payouts (Stripe Connect)
+  stripeAccountType: { 
+    type: String, 
+    enum: ['real', 'mock'], 
+    default: 'real' 
+  }, // Track account type
 
   // SaaS Plan Details
   plan: {

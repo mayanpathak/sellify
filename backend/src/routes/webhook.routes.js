@@ -3,7 +3,8 @@ import {
     handleStripeWebhook,
     getWebhookEvents,
     getWebhookEventDetails,
-    getWebhookStats
+    getWebhookStats,
+    completeMockPayment
 } from '../controllers/webhook.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
@@ -23,5 +24,8 @@ router.post('/stripe', express.raw({ type: 'application/json' }), handleStripeWe
 router.get('/events', protect, getWebhookEvents);
 router.get('/events/:eventId', protect, getWebhookEventDetails);
 router.get('/stats', protect, getWebhookStats);
+
+// Mock payment completion route
+router.post('/mock-payment-complete', completeMockPayment);
 
 export default router; 

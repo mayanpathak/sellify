@@ -436,4 +436,56 @@ export const getWebhookStats = asyncHandler(async (req, res) => {
         status: 'success',
         data: result
     });
+});
+
+// Mock payment completion handler
+export const completeMockPayment = asyncHandler(async (req, res) => {
+    const { sessionId } = req.body;
+    
+    try {
+        // Find the payment by session ID
+        const payment = await Payment.findOne({ stripeSessionId: sessionId });
+        if (!payment) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Payment session not found'
+            });
+        }
+
+        // Update payment status to completed
+        payment.status = 'succeeded';
+        payment.stripePaymentIntentId = `pi_mock_${Date.now()}`;
+        await payment.save();
+
+        // Create a submission record if this is from a checkout page
+        const page = await CheckoutPage.findById(payment.pageId);
+        if (page) {
+            const submission = new Submission({
+                pageId: payment.pageId,
+                userId: page.userId,
+                paymentId: payment._id,
+                formData: req.body.formData || {},
+                paymentStatus: 'completed',
+                paymentAmount: payment.amount,
+                customerEmail: req.body.customerEmail || 'test@example.com',
+            });
+            
+            await submission.save();
+        }
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Mock payment completed successfully',
+            data: {
+                paymentId: payment._id,
+                sessionId: sessionId
+            }
+        });
+    } catch (error) {
+        console.error('Mock payment completion error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to complete mock payment'
+        });
+    }
 }); 

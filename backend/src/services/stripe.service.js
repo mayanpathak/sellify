@@ -43,13 +43,45 @@ import stripe from '../config/stripe.js';
  * @param   {string} userId - MongoDB user ID
  * @returns {Promise<object>}
  */
-export const connectStripeAccount = async (userId) => {
+export const connectStripeAccount = async (userId, accountType = 'real') => {
     const user = await User.findById(userId);
     if (!user) {
         throw new Error('User not found');
     }
 
+    // Check if user already has a Stripe account
+    if (user.stripeAccountId) {
+        return {
+            message: 'Stripe account already connected.',
+            stripeAccountId: user.stripeAccountId,
+            onboardingUrl: null,
+            isMock: user.stripeAccountId.startsWith('acct_mock_'),
+        };
+    }
+
+    if (accountType === 'mock') {
+        // Create a mock Stripe account for development/testing
+        const mockStripeAccountId = `acct_mock_${Date.now()}`;
+        
+        await User.findByIdAndUpdate(userId, {
+            stripeAccountId: mockStripeAccountId,
+            stripeAccountType: 'mock', // Track account type
+        });
+
+        return {
+            message: 'Mock Stripe account created for testing purposes.',
+            stripeAccountId: mockStripeAccountId,
+            onboardingUrl: null, // No onboarding needed for mock
+            isMock: true,
+        };
+    }
+
     try {
+        // Check if real Stripe is configured
+        if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here') {
+            throw new Error('Stripe is not configured. Please set up your Stripe API keys or use mock mode.');
+        }
+
         // Create Stripe Express account
         const account = await stripe.accounts.create({
             type: 'express',
@@ -68,31 +100,16 @@ export const connectStripeAccount = async (userId) => {
         // Save account ID to user
         await User.findByIdAndUpdate(userId, {
             stripeAccountId: account.id,
+            stripeAccountType: 'real', // Track account type
         });
 
         return {
             message: 'Stripe account created successfully.',
             stripeAccountId: account.id,
             onboardingUrl: accountLink.url,
+            isMock: false,
         };
     } catch (error) {
-        // Only fallback to mock if Stripe credentials are missing or invalid
-        if (process.env.NODE_ENV === 'development' && 
-            (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')) {
-            
-            const mockStripeAccountId = `acct_mock_${Date.now()}`;
-            
-            await User.findByIdAndUpdate(userId, {
-                stripeAccountId: mockStripeAccountId,
-            });
-
-            return {
-                message: 'Stripe account connected successfully (mocked - Stripe not configured).',
-                stripeAccountId: mockStripeAccountId,
-                onboardingUrl: `https://connect.stripe.com/mock/onboarding/${mockStripeAccountId}`,
-            };
-        }
-        
         console.error('Stripe account creation failed:', error);
         throw new Error(`Failed to create Stripe account: ${error.message}`);
     }
@@ -114,15 +131,11 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
         throw new Error('The page owner has not connected a Stripe account.');
     }
 
-    // Only use mock mode if Stripe credentials are missing or explicitly disabled
-    const shouldUseMock = (
-        process.env.NODE_ENV === 'development' && 
-        user.stripeAccountId.startsWith('acct_mock_') &&
-        (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_your_stripe_secret_key_here')
-    );
+    // Check if this is a mock account
+    const isMockAccount = user.stripeAccountId.startsWith('acct_mock_');
 
-    if (shouldUseMock) {
-        // Handle mock development mode ONLY when Stripe is not properly configured
+    if (isMockAccount) {
+        // Handle mock payment flow - create a mock checkout page
         const mockSessionId = `cs_test_mock_${Date.now()}`;
         
         // Create mock payment record
@@ -147,10 +160,11 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
 
         return {
             success: true,
-            message: 'Stripe checkout session created (mocked - Stripe not configured).',
-            url: `${process.env.CLIENT_URL}/payment/success?session_id=${mockSessionId}`,
+            message: 'Mock Stripe checkout session created for testing.',
+            url: `${process.env.CLIENT_URL}/mock-checkout?session_id=${mockSessionId}&page_id=${pageId}`,
             sessionId: mockSessionId,
             paymentId: payment._id,
+            isMock: true,
         };
     }
 

@@ -30,6 +30,7 @@ const PaymentSuccess: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const sessionId = searchParams.get('session_id');
+  const isMock = searchParams.get('mock') === 'true';
 
   useEffect(() => {
     if (sessionId) {
@@ -185,6 +186,11 @@ ${paymentDetails.customerEmail ? `Email: ${paymentDetails.customerEmail}` : ''}
           <CardDescription className="text-lg">
             Thank you for your purchase. Your payment has been processed successfully.
           </CardDescription>
+          {isMock && (
+            <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700 border-blue-200">
+              🧪 Test Payment - No real money was charged
+            </Badge>
+          )}
         </CardHeader>
         
         <CardContent className="space-y-6">
