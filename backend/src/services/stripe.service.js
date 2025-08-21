@@ -110,6 +110,40 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
         throw new Error('The page owner has not connected a Stripe account.');
     }
 
+    // Check if we're in development mode with a mock account
+    if (process.env.NODE_ENV === 'development' && user.stripeAccountId.startsWith('acct_mock_')) {
+        // Handle mock development mode
+        const mockSessionId = `cs_test_mock_${Date.now()}`;
+        
+        // Create mock payment record
+        const payment = new Payment({
+            userId: userId,
+            pageId: pageId,
+            stripeSessionId: mockSessionId,
+            stripeAccountId: user.stripeAccountId,
+            amount: Math.round(page.price * 100),
+            currency: page.currency || 'usd',
+            applicationFeeAmount: Math.round(page.price * 100 * 0.05),
+            status: 'pending',
+            metadata: new Map(Object.entries({
+                pageId: pageId,
+                userId: userId,
+                mock: 'true'
+            })),
+            stripeCreatedAt: new Date(),
+        });
+
+        await payment.save();
+
+        return {
+            success: true,
+            message: 'Stripe checkout session created (mocked for development).',
+            url: `${process.env.CLIENT_URL}/payment/success?session_id=${mockSessionId}`,
+            sessionId: mockSessionId,
+            paymentId: payment._id,
+        };
+    }
+
     try {
         // Calculate total amount including order bumps
         let totalAmount = Math.round(page.price * 100);
@@ -197,40 +231,6 @@ export const createCheckoutSession = async ({ pageId, userId }) => {
         };
     } catch (error) {
         console.error('Stripe checkout session creation error:', error);
-        
-        // Fallback for development
-        if (process.env.NODE_ENV === 'development' && user.stripeAccountId.startsWith('acct_mock_')) {
-            const mockSessionId = `cs_test_mock_${Date.now()}`;
-            
-            // Create mock payment record
-            const payment = new Payment({
-                userId: userId,
-                pageId: pageId,
-                stripeSessionId: mockSessionId,
-                stripeAccountId: user.stripeAccountId,
-                amount: Math.round(page.price * 100),
-                currency: page.currency || 'usd',
-                applicationFeeAmount: Math.round(page.price * 100 * 0.05),
-                status: 'pending',
-                metadata: new Map(Object.entries({
-                    pageId: pageId,
-                    userId: userId,
-                    mock: 'true'
-                })),
-                stripeCreatedAt: new Date(),
-            });
-
-            await payment.save();
-
-            return {
-                success: true,
-                message: 'Stripe checkout session created (mocked for development).',
-                url: `${process.env.CLIENT_URL}/payment/success?session_id=${mockSessionId}`,
-                sessionId: mockSessionId,
-                paymentId: payment._id,
-            };
-        }
-        
         throw error;
     }
 };

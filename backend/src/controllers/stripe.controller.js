@@ -179,13 +179,50 @@ export const verifyPaymentStatus = asyncHandler(async (req, res) => {
     }
 
     const Payment = (await import('../models/Payment.js')).default;
-    const payment = await Payment.findOne({ stripeSessionId: sessionId })
+    const Submission = (await import('../models/Submission.js')).default;
+    
+    let payment = await Payment.findOne({ stripeSessionId: sessionId })
         .populate('pageId', 'title productName slug')
         .lean();
 
     if (!payment) {
         res.status(404);
         throw new Error('Payment not found');
+    }
+
+    // For development mock payments, simulate completion
+    if (process.env.NODE_ENV === 'development' && sessionId.startsWith('cs_test_mock_')) {
+        if (payment.status === 'pending') {
+            // Update payment status to completed
+            await Payment.findOneAndUpdate(
+                { stripeSessionId: sessionId },
+                { 
+                    status: 'completed',
+                    paymentCompletedAt: new Date(),
+                    webhookProcessed: true,
+                    webhookProcessedAt: new Date()
+                }
+            );
+
+            // Update associated submission if it exists
+            const recentSubmission = await Submission.findOne({
+                pageId: payment.pageId._id,
+                createdAt: { 
+                    $gte: new Date(Date.now() - 30 * 60 * 1000) // Within last 30 minutes
+                }
+            }).sort({ createdAt: -1 });
+
+            if (recentSubmission && !recentSubmission.paymentId) {
+                recentSubmission.paymentId = payment._id;
+                recentSubmission.paymentStatus = 'completed';
+                await recentSubmission.save();
+            }
+
+            // Refresh payment data
+            payment = await Payment.findOne({ stripeSessionId: sessionId })
+                .populate('pageId', 'title productName slug')
+                .lean();
+        }
     }
 
     // Return limited payment details for public verification
